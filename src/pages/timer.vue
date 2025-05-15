@@ -354,7 +354,7 @@
     schedules.value.splice(idx, 1)
     closeEditDialog()
     sendStateToBackend(
-      getLightingFromStorage(), // <-- see below
+      getLightingFromStorage(),
       {
         scheduleCount: schedules.value.length,
         schedules: formatSchedulesForBackend(schedules.value),

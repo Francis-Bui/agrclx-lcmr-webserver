@@ -137,11 +137,17 @@
     localStorage.setItem('selectedChip', val)
   })
 
+  // Gets array from sliderValues dict
+  function getLightingArrayFromSliders () {
+    const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+    return order.map(k => Number(sliderValues[k]) || 0)
+  }
+
   // Save slider values on manual input
   function saveSliderValues () {
     localStorage.setItem('lightSliderValues', JSON.stringify(sliderValues))
     sendStateToBackend(
-      sliderValues,
+      getLightingArrayFromSliders(), // send as array, not object
       getSchedulesFromStorage()
     )
   }
