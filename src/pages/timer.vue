@@ -17,6 +17,7 @@
             v-model="schedule.enabled"
             :color="schedule.enabled ? 'success' : 'error'"
             hide-details
+            @change="onScheduleSwitchChange"
             @click.stop
           />
         </v-card-title>
@@ -302,6 +303,19 @@
     })
     const result = await response.json()
     console.log('Backend response:', result) // Debug print
+  }
+
+  function onScheduleSwitchChange () {
+    // Save to localStorage
+    localStorage.setItem('schedules', JSON.stringify(schedules.value))
+    // Send updated state to backend
+    sendStateToBackend(
+      getLightingFromStorage(),
+      {
+        scheduleCount: schedules.value.length,
+        schedules: formatSchedulesForBackend(schedules.value),
+      }
+    )
   }
 
   function openCreateDialog () {

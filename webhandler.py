@@ -15,9 +15,9 @@ def state():
         print("Received from frontend:", data)  # Debug print
         return jsonify({"status": "ok", "received": data})
     else:
-        # Example lighting values: [IR, R, G, B, W, UV]
+        # Lighting format: [IR, R, G, B, W, UV]; each value is an integer from 0-100
         lighting_values = [0, 0, 0, 0, 0, 0]
-        # Example schedules: [scheduleEnabled, startTime, endTime, IR, R, G, B, W, UV]
+        # Schedule format: [scheduleEnabled, startTime, endTime, IR, R, G, B, W, UV]
         schedules = [
             [False, 0, 2400, False, False, False, False, False, False]
         ]
