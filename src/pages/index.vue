@@ -160,12 +160,23 @@
   function getSchedulesFromStorage () {
     const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
     const saved = JSON.parse(localStorage.getItem('schedules') || '[]')
+
+    function toMilitaryTime (str) {
+      if (!str) return 0
+      let [h, m, ampm] = str.split(':')
+      h = parseInt(h)
+      m = parseInt(m)
+      if (ampm === 'PM' && h !== 12) h += 12
+      if (ampm === 'AM' && h === 12) h = 0
+      return (h * 100) + m
+    }
+
     return {
       scheduleCount: saved.length,
       schedules: saved.map(s => [
         !!s.enabled,
-        s.start ? parseInt(s.start.replace(':', '').replace(':', '')) : 0,
-        s.end ? parseInt(s.end.replace(':', '').replace(':', '')) : 0,
+        toMilitaryTime(s.start),
+        toMilitaryTime(s.end),
         ...lightOrder.map(light => s.lights && s.lights.includes(light)),
       ]),
     }
