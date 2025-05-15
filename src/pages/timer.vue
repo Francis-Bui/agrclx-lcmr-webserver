@@ -154,9 +154,6 @@
     <!-- Time Picker Dialog -->
     <v-dialog v-model="timePickerDialog.visible" max-width="320" persistent>
       <v-card>
-        <v-card-title>
-          <span>{{ timePickerDialog.type === 'start' ? 'Pick Start Time' : 'Pick End Time' }}</span>
-        </v-card-title>
         <v-time-picker
           v-model="timePickerDialog.time"
           :color="timePickerDialog.type === 'start' ? 'success' : 'error'"
@@ -261,6 +258,7 @@
     localStorage.setItem('schedules', JSON.stringify(val))
   }, { deep: true })
 
+  // Change formatting to simplify backend processing
   function formatSchedulesForBackend (schedules) {
     // Light order: IR, R, G, B, W, UV
     const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
@@ -283,6 +281,7 @@
     ])
   }
 
+  // Get lighting values from local storage to prevent sending null values
   function getLightingFromStorage () {
     // Should match the order [IR, R, G, B, W, UV]
     const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']

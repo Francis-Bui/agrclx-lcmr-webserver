@@ -108,6 +108,7 @@
     selectedChip.value === 'White' ? '#333' : '#fff'
   )
 
+  // All sliders start at 0 for safety
   const defaultSliderValues = {
     IR: 0,
     Red: 0,
@@ -153,6 +154,7 @@
     saveSliderValues()
   }
 
+  // Get schedules from local storage to prevent sending null values
   function getSchedulesFromStorage () {
     const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
     const saved = JSON.parse(localStorage.getItem('schedules') || '[]')
