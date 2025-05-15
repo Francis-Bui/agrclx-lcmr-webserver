@@ -223,7 +223,7 @@
 
   const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
-  const BACKEND_URL = 'http://192.168.0.148:5000' // Device IP address
+  const BACKEND_URL = `http://${window.location.hostname}:5000` // Device IP address
 
   const schedules = ref([]) // {id, title, start, end, lights, enabled}
   const createDialog = ref(false)

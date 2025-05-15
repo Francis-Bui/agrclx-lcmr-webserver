@@ -95,7 +95,7 @@
 
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
-  const BACKEND_URL = 'http://192.168.0.148:5000' // Device IP address
+  const BACKEND_URL = `http://${window.location.hostname}:5000` // Device IP address
 
   const chipColors = {
     IR: '#ff5252', // Red
