@@ -222,6 +222,8 @@
 
   const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
+  const BACKEND_URL = 'http://192.168.0.148:5000' // Device IP address
+
   const schedules = ref([]) // {id, title, start, end, lights, enabled}
   const createDialog = ref(false)
   const editDialog = ref(false)
@@ -290,7 +292,7 @@
   }
 
   async function sendStateToBackend (lighting, scheduleData) {
-    const response = await fetch('http://localhost:5000/api/state', {
+    const response = await fetch(`${BACKEND_URL}/api/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -95,6 +95,8 @@
 
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
+  const BACKEND_URL = 'http://192.168.0.148:5000' // Device IP address
+
   const chipColors = {
     IR: '#ff5252', // Red
     Red: '#ff5252', // Red
@@ -171,7 +173,7 @@
 
   // Send lighting and schedule data to Flask
   async function sendStateToBackend (lighting, scheduleData) {
-    const response = await fetch('http://localhost:5000/api/state', {
+    const response = await fetch(`${BACKEND_URL}/api/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
