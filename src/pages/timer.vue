@@ -27,11 +27,11 @@
           </div>
           <v-chip-group column multiple>
             <v-chip
-              v-for="chip in schedule.chips"
-              :key="chip"
+              v-for="light in schedule.lights"
+              :key="light"
               class="ma-1"
               color="primary"
-            >{{ chip }}</v-chip>
+            >{{ light }}</v-chip>
           </v-chip-group>
         </v-card-text>
       </v-card>
@@ -110,21 +110,21 @@
               </v-btn>
             </div>
             <v-chip-group
-              v-model="editScheduleData.chips"
+              v-model="editScheduleData.lights"
               class="mb-2 d-flex flex-wrap justify-center"
               column
               multiple
             >
               <v-chip
-                v-for="chip in chips"
-                :key="chip"
+                v-for="light in lights"
+                :key="light"
                 class="ma-1"
                 color="primary"
                 size="small"
-                :value="chip"
-                :variant="editScheduleData.chips.includes(chip) ? 'elevated' : 'outlined'"
+                :value="light"
+                :variant="editScheduleData.lights.includes(light) ? 'elevated' : 'outlined'"
               >
-                {{ chip }}
+                {{ light }}
               </v-chip>
             </v-chip-group>
           </div>
@@ -223,9 +223,9 @@
 <script setup>
   import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-  const chips = ['IR', 'UV', 'Red', 'Green', 'Blue', 'White']
+  const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
-  const schedules = ref([]) // {id, title, start, end, chips, enabled}
+  const schedules = ref([]) // {id, title, start, end, lights, enabled}
   const createDialog = ref(false)
   const editDialog = ref(false)
   const editingIdx = ref(null)
@@ -234,7 +234,7 @@
     title: 'Untitled Schedule',
     start: null,
     end: null,
-    chips: [],
+    lights: [],
     enabled: true,
   })
 
@@ -261,6 +261,48 @@
     localStorage.setItem('schedules', JSON.stringify(val))
   }, { deep: true })
 
+  function formatSchedulesForBackend (schedules) {
+    // Light order: IR, R, G, B, W, UV
+    const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+
+    function toMilitaryTime (str) {
+      if (!str) return 0
+      let [h, m, ampm] = str.split(':')
+      h = parseInt(h)
+      m = parseInt(m)
+      if (ampm === 'PM' && h !== 12) h += 12
+      if (ampm === 'AM' && h === 12) h = 0
+      return (h * 100) + m
+    }
+
+    return schedules.map(s => [
+      !!s.enabled,
+      toMilitaryTime(s.start),
+      toMilitaryTime(s.end),
+      ...lightOrder.map(light => s.lights && s.lights.includes(light)),
+    ])
+  }
+
+  function getLightingFromStorage () {
+    // Should match the order [IR, R, G, B, W, UV]
+    const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+    const saved = JSON.parse(localStorage.getItem('lightSliderValues') || '{}')
+    return order.map(k => Number(saved[k]) || 0)
+  }
+
+  async function sendStateToBackend (lighting, scheduleData) {
+    const response = await fetch('http://localhost:5000/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lighting,
+        scheduleData,
+      }),
+    })
+    const result = await response.json()
+    console.log('Backend response:', result) // Debug print
+  }
+
   function openCreateDialog () {
     createDialog.value = true
   }
@@ -278,7 +320,7 @@
         title: 'Untitled Schedule',
         start: null,
         end: null,
-        chips: [],
+        lights: [],
         enabled: true,
       })
     } else {
@@ -296,6 +338,13 @@
   function deleteSchedule (idx) {
     schedules.value.splice(idx, 1)
     closeEditDialog()
+    sendStateToBackend(
+      getLightingFromStorage(), // <-- see below
+      {
+        scheduleCount: schedules.value.length,
+        schedules: formatSchedulesForBackend(schedules.value),
+      }
+    )
   }
   function showTimePicker (type) {
     timePickerDialog.type = type
@@ -340,7 +389,7 @@
     editScheduleData.title &&
     editScheduleData.start &&
     editScheduleData.end &&
-    editScheduleData.chips.length > 0
+    editScheduleData.lights.length > 0
   )
 
   function saveSchedule () {
@@ -348,11 +397,11 @@
     for (let i = 0; i < schedules.value.length; i++) {
       if (editingIdx.value !== null && i === editingIdx.value) continue
       const s = schedules.value[i]
-      for (const chip of editScheduleData.chips) {
-        if (s.chips.includes(chip)) {
+      for (const light of editScheduleData.lights) {
+        if (s.lights.includes(light)) {
           // Check time overlap
           if (timesOverlap(editScheduleData.start, editScheduleData.end, s.start, s.end)) {
-            conflictDialog.chip = chip
+            conflictDialog.chip = light
             conflictDialog.conflictTitle = s.title
             conflictDialog.overlap = `${formatTime(s.start)} - ${formatTime(s.end)}`
             conflictDialog.visible = true
@@ -367,6 +416,13 @@
       schedules.value[editingIdx.value] = JSON.parse(JSON.stringify(editScheduleData))
     }
     closeEditDialog()
+    sendStateToBackend(
+      getLightingFromStorage(), // <-- see below
+      {
+        scheduleCount: schedules.value.length,
+        schedules: formatSchedulesForBackend(schedules.value),
+      }
+    )
   }
   function timesOverlap (start1, end1, start2, end2) {
     // Convert to minutes since midnight

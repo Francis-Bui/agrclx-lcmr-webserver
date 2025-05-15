@@ -93,15 +93,15 @@
 <script setup>
   import { computed, onMounted, reactive, ref, watch } from 'vue'
 
-  const chips = ['IR', 'UV', 'Red', 'Green', 'Blue', 'White']
+  const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
   const chipColors = {
     IR: '#ff5252', // Red
-    UV: '#7c4dff', // Purple
     Red: '#ff5252', // Red
     Green: '#4caf50', // Green
     Blue: '#2196f3', // Blue
     White: '#e0e0e0', // Light grey
+    UV: '#7c4dff', // Purple
   }
 
   const textColor = computed(() =>
@@ -110,11 +110,11 @@
 
   const defaultSliderValues = {
     IR: 0,
-    UV: 0,
     Red: 0,
     Green: 0,
     Blue: 0,
     White: 0,
+    UV: 0,
   }
 
   const sliderValues = reactive({ ...defaultSliderValues })
@@ -137,6 +137,10 @@
   // Save slider values on manual input
   function saveSliderValues () {
     localStorage.setItem('lightSliderValues', JSON.stringify(sliderValues))
+    sendStateToBackend(
+      sliderValues,
+      getSchedulesFromStorage()
+    )
   }
 
   // Prevent numbers > 100 in text field
@@ -147,6 +151,34 @@
       sliderValues[selectedChip.value] = 0
     }
     saveSliderValues()
+  }
+
+  function getSchedulesFromStorage () {
+    const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+    const saved = JSON.parse(localStorage.getItem('schedules') || '[]')
+    return {
+      scheduleCount: saved.length,
+      schedules: saved.map(s => [
+        !!s.enabled,
+        s.start ? parseInt(s.start.replace(':', '').replace(':', '')) : 0,
+        s.end ? parseInt(s.end.replace(':', '').replace(':', '')) : 0,
+        ...lightOrder.map(light => s.lights && s.lights.includes(light)),
+      ]),
+    }
+  }
+
+  // Send lighting and schedule data to Flask
+  async function sendStateToBackend (lighting, scheduleData) {
+    const response = await fetch('http://localhost:5000/api/state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lighting,
+        scheduleData,
+      }),
+    })
+    const result = await response.json()
+    console.log('Backend response:', result) // Debug print
   }
 
   // Pulsating fire effect
