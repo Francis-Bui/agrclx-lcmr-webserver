@@ -1,108 +1,78 @@
 <template>
-  <v-card style="margin: auto" width="400">
-    <!-- Title -->
-    <v-container class="d-flex flex-column align-center pt-6 pb-2">
-      <span class="text-h3 font-weight-bold text-center">LCMR_2</span>
-    </v-container>
-    <v-divider class="mb-2" />
+  <div class="page-root">
+    <v-card style="margin: auto" width="400">
+      <!-- Title -->
+      <v-container class="d-flex flex-column align-center pt-6 pb-2">
+        <span class="text-h3 font-weight-bold text-center">LCMR_2</span>
+      </v-container>
+      <v-divider class="mb-2" />
 
-    <v-container class="d-flex justify-center">
-      <v-chip-group
-        v-model="selectedChip"
-        class="d-flex flex-wrap justify-center"
-        mandatory
-      >
-        <v-chip
-          v-for="chip in chips"
-          :key="chip"
-          class="ma-1"
-          :color="chipColors[chip]"
-          size="small"
-          :value="chip"
-          :variant="selectedChip === chip ? 'elevated' : 'outlined'"
+      <v-container class="d-flex justify-center">
+        <v-chip-group
+          v-model="selectedChip"
+          class="d-flex flex-wrap justify-center"
+          mandatory
         >
-          {{ chip }}
-        </v-chip>
-      </v-chip-group>
-    </v-container>
+          <v-chip
+            v-for="chip in chips"
+            :key="chip"
+            class="ma-1"
+            :color="chipColors[chip]"
+            size="small"
+            :value="chip"
+            :variant="selectedChip === chip ? 'elevated' : 'outlined'"
+          >
+            {{ chip }}
+          </v-chip>
+        </v-chip-group>
+      </v-container>
 
-    <v-divider />
+      <v-divider />
 
-    <!-- Animated Circle -->
-    <v-container class="d-flex justify-center my-4">
-      <div
-        class="d-flex align-center justify-center pulse-circle"
-        :style="circleStyle"
-      >
-        <span class="text-h4 font-weight-bold" :style="{color: textColor}">
-          {{ sliderValues[selectedChip] }}%
-        </span>
-      </div>
-    </v-container>
+      <!-- Animated Circle -->
+      <v-container class="d-flex justify-center my-4">
+        <div
+          class="d-flex align-center justify-center pulse-circle"
+          :style="circleStyle"
+        >
+          <span class="text-h4 font-weight-bold" :style="{color: textColor}">
+            {{ sliderValues[selectedChip] }}%
+          </span>
+        </div>
+      </v-container>
 
-    <v-card-text>
-      <v-slider
-        v-model="sliderValues[selectedChip]"
-        class="ma-4"
-        :color="chipColors[selectedChip]"
-        hide-details
-        :max="100"
-        :step="1"
-        @update:model-value="saveSliderValues"
-      >
-        <template #append>
-          <v-text-field
-            v-model="sliderValues[selectedChip]"
-            density="compact"
-            hide-details
-            :max="100"
-            style="width: 80px"
-            suffix="%"
-            type="number"
-            variant="outlined"
-            @update:model-value="onTextFieldInput"
-          />
-        </template>
-      </v-slider>
-    </v-card-text>
-
-    <v-divider />
-
-    <v-bottom-navigation
-      color="primary"
-      grow
-      mode="fixed"
-      style="border-radius: 0 0 12px 12px;"
-    >
-      <v-btn :active="$route.path === '/'" icon to="/">
-        <v-icon>mdi-lightbulb-outline</v-icon>
-        <span>Light</span>
-      </v-btn>
-      <v-btn :active="$route.path === '/timer'" icon to="/timer">
-        <v-icon>mdi-timer-outline</v-icon>
-        <span>Timer</span>
-      </v-btn>
-      <v-btn :active="$route.path === '/data'" icon to="/data">
-        <v-icon>mdi-database-outline</v-icon>
-        <span>Data</span>
-      </v-btn>
-    </v-bottom-navigation>
-  </v-card>
-
-  <v-dialog v-model="showManualPopup" max-width="320" persistent>
-    <v-card class="text-center" color="warning">
-      <v-card-title class="text-h6">Manual Interface In Use</v-card-title>
       <v-card-text>
-        The touchscreen interface is currently controlling the system.<br>
-        Remote control will resume when the touchscreen is inactive for 5 seconds.
+        <v-slider
+          v-model="sliderValues[selectedChip]"
+          class="ma-4"
+          :color="chipColors[selectedChip]"
+          hide-details
+          :max="100"
+          :step="1"
+          @update:model-value="saveSliderValues"
+        >
+          <template #append>
+            <v-text-field
+              v-model="sliderValues[selectedChip]"
+              density="compact"
+              hide-details
+              :max="100"
+              style="width: 80px"
+              suffix="%"
+              type="number"
+              variant="outlined"
+              @update:model-value="onTextFieldInput"
+            />
+          </template>
+        </v-slider>
       </v-card-text>
+      <v-divider />
     </v-card>
-  </v-dialog>
-
+  </div>
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
@@ -133,26 +103,13 @@
 
   const sliderValues = reactive({ ...defaultSliderValues })
   const selectedChip = ref('IR')
+  let pollInterval = null
 
-  const showManualPopup = ref(false)
-  let lockInterval = null
-
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-
+  // Persistence
   onMounted(() => {
-    if (!isLocal) {
-      lockInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${BACKEND_URL}/api/lock_status`)
-          const { local_lock } = await res.json()
-          showManualPopup.value = local_lock
-        } catch (err) {
-          console.error('Error fetching lock status:', err)
-        }
-      }, 1000)
-    }
+
     // Poll for state updates (for all clients)
-    setInterval(async () => {
+    pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`${BACKEND_URL}/api/state`)
         const data = await res.json()
@@ -164,30 +121,28 @@
             sliderValues[k] = data.lighting[i]
           })
         }
-      // If you want to update schedules, do similar for schedules here
-      // (for timer.vue)
+        // If you want to update schedules, do similar for schedules here
+        // (for timer.vue)
       } catch (err) {
         console.error('Error fetching state:', err)
       }
     }, 1000)
-  })
 
-  // Persistence
-  onMounted(() => {
     const saved = localStorage.getItem('lightSliderValues')
     if (saved) Object.assign(sliderValues, JSON.parse(saved))
     const savedChip = localStorage.getItem('selectedChip')
     if (savedChip && chips.includes(savedChip)) selectedChip.value = savedChip
   })
+
+  onUnmounted(() => {
+    if (pollInterval) clearInterval(pollInterval)
+  })
+
   watch(sliderValues, val => {
     localStorage.setItem('lightSliderValues', JSON.stringify(val))
   }, { deep: true })
   watch(selectedChip, val => {
     localStorage.setItem('selectedChip', val)
-  })
-
-  onUnmounted(() => {
-    if (lockInterval) clearInterval(lockInterval)
   })
 
   // Gets array from sliderValues dict
@@ -251,10 +206,7 @@
         scheduleData,
       }),
     })
-    if (response.status === 423) {
-      showManualPopup.value = true
-      return
-    }
+
     const result = await response.json()
     console.log('Backend response:', result) // Debug print
   }

@@ -29,6 +29,11 @@ router.onError((err, to) => {
   }
 })
 
+router.beforeEach((to, from, next) => {
+  to.meta.from = from.path
+  next()
+})
+
 router.isReady().then(() => {
   localStorage.removeItem('vuetify:dynamic-reload')
 })
