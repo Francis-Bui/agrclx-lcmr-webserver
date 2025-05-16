@@ -216,14 +216,25 @@
       </v-btn>
     </v-bottom-navigation>
   </v-container>
+
+  <v-dialog v-model="showManualPopup" max-width="320" persistent>
+    <v-card class="text-center" color="warning">
+      <v-card-title class="text-h6">Manual Interface In Use</v-card-title>
+      <v-card-text>
+        The touchscreen interface is currently controlling the system.<br>
+        Remote control will resume when the touchscreen is inactive for 5 seconds.
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref, watch } from 'vue'
+  import { computed, onMounted, reactive, ref } from 'vue'
 
   const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
-  const BACKEND_URL = `http://${window.location.hostname}:5000` // Device IP address
+  const BACKEND_URL = `http://${window.location.hostname}:8080` // Device IP address
 
   const schedules = ref([]) // {id, title, start, end, lights, enabled}
   const createDialog = ref(false)
@@ -252,14 +263,90 @@
     overlap: '',
   })
 
+  const showManualPopup = ref(false)
+
+  let lockInterval = null
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   // Persistence: Load from localStorage on mount, save on change
   onMounted(() => {
-    const saved = localStorage.getItem('schedules')
-    if (saved) schedules.value = JSON.parse(saved)
+    if (!isLocal) {
+      lockInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/lock_status`)
+          const { local_lock } = await res.json()
+          showManualPopup.value = local_lock
+        } catch (err) {
+          console.error('Error fetching lock status:', err)
+        }
+      }, 1000)
+    }
+
+    // Poll for schedule state updates (for all clients)
+    setInterval(async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/state`)
+        const data = await res.json()
+        if (data.scheduleData && Array.isArray(data.scheduleData.schedules)) {
+          // Only update if different to avoid unnecessary reactivity triggers
+          const newSchedules = JSON.stringify(data.scheduleData.schedules)
+          const currentSchedules = JSON.stringify(formatSchedulesForBackend(schedules.value))
+          if (newSchedules !== currentSchedules) {
+            // Convert backend format back to local format
+            schedules.value = data.scheduleData.schedules.map(arr => {
+              // arr: [enabled, start, end, IR, R, G, B, W, UV]
+              const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+              return {
+                enabled: arr[0],
+                start: toTimeString(arr[1]),
+                end: toTimeString(arr[2]),
+                lights: lightOrder.filter((l, i) => arr[3 + i]),
+                title: 'Untitled Schedule',
+              }
+            })
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching schedule state:', err)
+      }
+    }, 1000)
+
+    // On mount, fetch schedules from backend instead of localStorage
+    fetch(`${BACKEND_URL}/api/state`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.scheduleData && Array.isArray(data.scheduleData.schedules)) {
+          const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+          schedules.value = data.scheduleData.schedules.map(arr => ({
+            enabled: arr[0],
+            start: toTimeString(arr[1]),
+            end: toTimeString(arr[2]),
+            lights: lightOrder.filter((l, i) => arr[3 + i]),
+            title: 'Untitled Schedule',
+          }))
+        }
+      })
   })
-  watch(schedules, val => {
-    localStorage.setItem('schedules', JSON.stringify(val))
-  }, { deep: true })
+
+  // Helper to convert military time integer to "HH:MM:AM/PM" string
+  function toTimeString (military) {
+    if (!military && military !== 0) return null
+    let h = Math.floor(military / 100)
+    const m = military % 100
+    let ampm = 'AM'
+    if (h === 0) {
+      h = 12
+    } else if (h === 12) {
+      ampm = 'PM'
+    } else if (h > 12) {
+      h -= 12
+      ampm = 'PM'
+    }
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${ampm}`
+  }
+
+  onUnmounted(() => {
+    if (lockInterval) clearInterval(lockInterval)
+  })
 
   // Change formatting to simplify backend processing
   function formatSchedulesForBackend (schedules) {
@@ -301,6 +388,10 @@
         scheduleData,
       }),
     })
+    if (response.status === 423) {
+      showManualPopup.value = true
+      return
+    }
     const result = await response.json()
     console.log('Backend response:', result) // Debug print
   }

@@ -88,6 +88,17 @@
       </v-btn>
     </v-bottom-navigation>
   </v-card>
+
+  <v-dialog v-model="showManualPopup" max-width="320" persistent>
+    <v-card class="text-center" color="warning">
+      <v-card-title class="text-h6">Manual Interface In Use</v-card-title>
+      <v-card-text>
+        The touchscreen interface is currently controlling the system.<br>
+        Remote control will resume when the touchscreen is inactive for 5 seconds.
+      </v-card-text>
+    </v-card>
+  </v-dialog>
+
 </template>
 
 <script setup>
@@ -95,7 +106,7 @@
 
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
 
-  const BACKEND_URL = `http://${window.location.hostname}:5000` // Device IP address
+  const BACKEND_URL = `http://${window.location.hostname}:8080` // Device IP address
 
   const chipColors = {
     IR: '#ff5252', // Red
@@ -123,6 +134,44 @@
   const sliderValues = reactive({ ...defaultSliderValues })
   const selectedChip = ref('IR')
 
+  const showManualPopup = ref(false)
+  let lockInterval = null
+
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+
+  onMounted(() => {
+    if (!isLocal) {
+      lockInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/lock_status`)
+          const { local_lock } = await res.json()
+          showManualPopup.value = local_lock
+        } catch (err) {
+          console.error('Error fetching lock status:', err)
+        }
+      }, 1000)
+    }
+    // Poll for state updates (for all clients)
+    setInterval(async () => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/state`)
+        const data = await res.json()
+        // Update lighting and schedules if changed
+        if (data.lighting) {
+          // Update sliderValues for each chip
+          const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+          order.forEach((k, i) => {
+            sliderValues[k] = data.lighting[i]
+          })
+        }
+      // If you want to update schedules, do similar for schedules here
+      // (for timer.vue)
+      } catch (err) {
+        console.error('Error fetching state:', err)
+      }
+    }, 1000)
+  })
+
   // Persistence
   onMounted(() => {
     const saved = localStorage.getItem('lightSliderValues')
@@ -135,6 +184,10 @@
   }, { deep: true })
   watch(selectedChip, val => {
     localStorage.setItem('selectedChip', val)
+  })
+
+  onUnmounted(() => {
+    if (lockInterval) clearInterval(lockInterval)
   })
 
   // Gets array from sliderValues dict
@@ -198,6 +251,10 @@
         scheduleData,
       }),
     })
+    if (response.status === 423) {
+      showManualPopup.value = true
+      return
+    }
     const result = await response.json()
     console.log('Backend response:', result) // Debug print
   }
@@ -251,8 +308,8 @@
     filter: brightness(1);
   }
   100% {
-    transform: scale(1.08);
-    filter: brightness(1.25);
+    transform: scale(1.17);
+    filter: brightness(1.35);
   }
 }
 </style>
