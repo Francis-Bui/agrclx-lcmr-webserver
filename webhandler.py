@@ -3,11 +3,17 @@ from flask_cors import CORS
 import time
 import os
 import json
+import threading
 
 app = Flask(__name__, static_folder='templates/assets')
 CORS(app)
 
 STATE_FILE = 'state.json'
+PROFILE_DIR = os.path.expanduser("~/Desktop/profiles")
+PROFILE_LOCK = threading.Lock()
+
+# Ensure profile directory exists
+os.makedirs(PROFILE_DIR, exist_ok=True)
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -80,6 +86,86 @@ def state():
             "scheduleData": schedule_dict
         }
         return jsonify(result)
+
+def list_profiles():
+    profiles = []
+    for fname in os.listdir(PROFILE_DIR):
+        if fname.endswith(".json"):
+            try:
+                with open(os.path.join(PROFILE_DIR, fname), 'r') as f:
+                    data = json.load(f)
+                    profiles.append({
+                        "name": data.get("name", fname[:-5]),
+                        "values": data.get("values", [])
+                    })
+            except Exception:
+                continue
+    return profiles
+
+@app.route('/api/profiles', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def profiles():
+    """
+    GET: List all profiles (name, values)
+    POST: Save new profile (error on duplicate)
+    PUT: Update existing profile
+    DELETE: Delete profile by name
+    """
+    if request.method == 'GET':
+        try:
+            with PROFILE_LOCK:
+                profiles = list_profiles()
+            return jsonify({"profiles": profiles}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        name = data.get('name')
+        values = data.get('values')
+        if not name or values is None:
+            return jsonify({"error": "Missing name or values"}), 400
+        fname = os.path.join(PROFILE_DIR, f"{name}.json")
+        with PROFILE_LOCK:
+            if os.path.exists(fname):
+                return jsonify({"error": "Profile with this name already exists"}), 409
+            try:
+                with open(fname, 'w') as f:
+                    json.dump({"name": name, "values": values}, f)
+                return jsonify({"status": "created"}), 201
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+    elif request.method == 'PUT':
+        data = request.get_json()
+        name = data.get('name')
+        values = data.get('values')
+        if not name or values is None:
+            return jsonify({"error": "Missing name or values"}), 400
+        fname = os.path.join(PROFILE_DIR, f"{name}.json")
+        with PROFILE_LOCK:
+            if not os.path.exists(fname):
+                return jsonify({"error": "Profile not found"}), 404
+            try:
+                with open(fname, 'w') as f:
+                    json.dump({"name": name, "values": values}, f)
+                return jsonify({"status": "updated"}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        name = data.get('name')
+        if not name:
+            return jsonify({"error": "Missing name"}), 400
+        fname = os.path.join(PROFILE_DIR, f"{name}.json")
+        with PROFILE_LOCK:
+            if not os.path.exists(fname):
+                return jsonify({"error": "Profile not found"}), 404
+            try:
+                os.remove(fname)
+                return jsonify({"status": "deleted"}), 200
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', debug=True, port=8080)
