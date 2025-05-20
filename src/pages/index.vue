@@ -1,6 +1,6 @@
 <template>
   <div class="page-root data-page-root">
-    <!-- Floating Save/Load Buttons -->
+    <!-- Floating Save/Load/Reset Buttons -->
     <div class="profile-fab-group">
       <v-btn
         class="profile-fab save"
@@ -24,6 +24,18 @@
         <v-icon>mdi-folder-open</v-icon>
       </v-btn>
     </div>
+    <v-btn
+      class="profile-fab reset-fab"
+      color="blue darken-2"
+      :disabled="lockStatus.local_lock"
+      elevation="8"
+      icon
+      rounded
+      style="position:fixed;bottom:70px;right:40px;z-index:20;"
+      @click="resetSliders"
+    >
+      <v-icon :class="{ 'spin': resetSpinning }">mdi-restore</v-icon>
+    </v-btn>
 
     <v-container
       class="d-flex flex-row justify-center align-center flex-wrap"
@@ -403,6 +415,16 @@
       animation: `pulse 1.2s infinite alternate`,
     }
   }
+
+  const resetSpinning = ref(false)
+  function resetSliders () {
+    if (lockStatus.local_lock) return
+    Object.keys(sliderValues).forEach(k => sliderValues[k] = 0)
+    sendSlidersToBackend()
+    resetSpinning.value = true
+    setTimeout(() => { resetSpinning.value = false }, 700)
+    showAlert('All lights reset to 0%', 'success')
+  }
 </script>
 
 <style scoped>
@@ -497,6 +519,7 @@
   box-shadow: 0 4px 24px rgba(0,0,0,0.18);
   text-align: center;
   opacity: 0.97;
+  transition: transform 0s;
 }
 .alert.success { background: #4caf50; color: #fff; }
 .alert.error { background: #ff5252; color: #fff; }
@@ -536,6 +559,24 @@
   align-items: flex-end;
   gap: 16px;
   z-index: 10;
+}
+.reset-fab {
+  background: #1976d2 !important;
+  color: #fff !important;
+  border-radius: 16px !important;
+  width: 56px;
+  height: 56px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.spin {
+  animation: spin 0.2s ease-in-out;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 .profile-fab {
   width: 56px;
