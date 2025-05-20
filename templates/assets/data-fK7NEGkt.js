@@ -1,1 +1,0 @@
-import{ad as e,T as a,W as s,X as r,_ as n}from"./index-DCsvryhv.js";import{V as o}from"./VContainer-CLzposn_.js";const c={};function f(i,t){return s(),a(o,{class:"fill-height d-flex align-center justify-center"},{default:r(()=>t[0]||(t[0]=[n("span",{class:"text-h4 font-weight-bold"},"Data Page",-1)])),_:1})}const _=e(c,[["render",f]]);export{_ as default};
