@@ -82,7 +82,6 @@
       const toIdx = pageOrder.indexOf(to)
       transitionName.value = toIdx > fromIdx ? 'slide-left' : 'slide-right'
       lastIndex.value = toIdx
-      console.log('Transition:', transitionName.value)
     }
   )
 </script>
