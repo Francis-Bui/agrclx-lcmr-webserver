@@ -116,26 +116,16 @@
                   />
                 </div>
               </v-list-item-content>
-              <!-- Delete icon: bottom left, Edit icon: bottom right -->
+              <!-- Delete icon: middle left -->
               <v-btn
                 class="profile-action-btn profile-action-btn-delete"
                 color="error"
                 icon
-                style="position:absolute;bottom:8px;left:8px;z-index:2;"
+                style="position:absolute;top:50%;transform:translateY(-50%);z-index:2;"
                 variant="tonal"
                 @click.stop="deleteProfile(profile)"
               >
                 <v-icon>mdi-delete</v-icon>
-              </v-btn>
-              <v-btn
-                class="profile-action-btn profile-action-btn-edit"
-                color="primary"
-                icon
-                style="position:absolute;bottom:8px;right:8px;z-index:2;"
-                variant="tonal"
-                @click.stop="editProfile(profile)"
-              >
-                <v-icon>mdi-pencil</v-icon>
               </v-btn>
             </v-list-item>
           </v-list>
@@ -185,7 +175,6 @@
   const dialogs = reactive({ save: false, load: false })
   const profiles = ref([])
   const profileName = ref('')
-  const editingProfile = ref(null)
 
   // Alert system
   const alert = reactive({ show: false, message: '', type: 'success' })
@@ -199,12 +188,11 @@
   }
 
   function openSaveDialog () {
-    profileName.value = editingProfile.value ? editingProfile.value.name : ''
+    profileName.value = ''
     dialogs.save = true
   }
   function closeSaveDialog () {
     dialogs.save = false
-    editingProfile.value = null
   }
   function openLoadDialog () {
     fetchProfiles()
@@ -212,7 +200,6 @@
   }
   function closeLoadDialog () {
     dialogs.load = false
-    editingProfile.value = null
   }
 
   function saveProfile () {
@@ -220,18 +207,16 @@
       name: profileName.value,
       values: chips.map(k => Number(sliderValues[k]) || 0),
     }
-    const method = editingProfile.value ? 'PUT' : 'POST'
     fetch(`${BACKEND_URL}/api/profiles`, {
-      method,
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
       .then(async res => {
         if (res.ok) {
-          showAlert(editingProfile.value ? 'Profile updated!' : 'Profile saved!', 'success')
+          showAlert('Profile saved!', 'success')
           fetchProfiles()
           dialogs.save = false
-          editingProfile.value = null
         } else if (res.status === 409) {
           showAlert('Profile name already exists!', 'warning')
         } else {
@@ -254,14 +239,6 @@
     sendSlidersToBackend()
     dialogs.load = false
     showAlert('Profile loaded!', 'success')
-  }
-
-  function editProfile (profile) {
-    editingProfile.value = profile
-    profileName.value = profile.name
-    chips.forEach((k, i) => (sliderValues[k] = profile.values[i]))
-    dialogs.load = false
-    dialogs.save = true
   }
 
   function deleteProfile (profile) {

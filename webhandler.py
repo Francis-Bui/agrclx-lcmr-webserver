@@ -135,23 +135,6 @@ def profiles():
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
-    elif request.method == 'PUT':
-        data = request.get_json()
-        name = data.get('name')
-        values = data.get('values')
-        if not name or values is None:
-            return jsonify({"error": "Missing name or values"}), 400
-        fname = os.path.join(PROFILE_DIR, f"{name}.json")
-        with PROFILE_LOCK:
-            if not os.path.exists(fname):
-                return jsonify({"error": "Profile not found"}), 404
-            try:
-                with open(fname, 'w') as f:
-                    json.dump({"name": name, "values": values}, f)
-                return jsonify({"status": "updated"}), 200
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-
     elif request.method == 'DELETE':
         data = request.get_json()
         name = data.get('name')
