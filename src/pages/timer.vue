@@ -2,73 +2,82 @@
   <div class="page-root">
     <v-container class="fill-height d-flex flex-column align-center justify-center">
       <!-- Schedules List -->
-      <div v-if="schedules.length > 0" class="w-100 d-flex flex-column align-center">
-        <v-card
-          v-for="(schedule, idx) in schedules"
-          :key="schedule.id"
-          class="mb-4 schedule-card"
-          elevation="6"
-          style="width: 420px; border-radius: 24px; position:relative;"
-        >
-          <div class="d-flex justify-space-between align-center px-4 pt-3">
-            <span class="schedule-title">{{ schedule.title }}</span>
-            <v-switch
-              v-model="schedule.enabled"
-              class="schedule-switch"
-              :color="schedule.enabled ? 'success' : 'error'"
-              hide-details
-              @change="onScheduleSwitchChange(schedule)"
-              @click.stop
-            />
-          </div>
-          <div class="d-flex flex-row align-center px-4 pb-2 pt-1" style="gap: 24px;">
-            <div class="d-flex flex-column align-start" style="min-width:120px;">
-              <div><strong>Start:</strong> {{ formatTime(schedule.start) }}</div>
-              <div><strong>End:</strong> {{ formatTime(schedule.end) }}</div>
-            </div>
-            <div class="flex-grow-1 d-flex align-center justify-center">
-              <div class="profile-bar schedule-bar-graph">
-                <div
-                  v-for="(val, i) in schedule.profile_values"
-                  :key="lights[i]"
-                  class="profile-bar-mini"
-                  :style="{ background: chipColors[lights[i]], height: (val || 0) + '%', opacity: 0.85 }"
+      <div v-if="schedules.length > 0" class="schedule-list-scroll">
+        <v-row class="w-100" dense>
+          <v-col
+            v-for="(schedule, idx) in schedules"
+            :key="schedule.id"
+            class="d-flex justify-center"
+            cols="12"
+            sm="6"
+          >
+            <v-card
+              class="mb-4 schedule-card"
+              elevation="6"
+              style="border-radius: 24px; position:relative;"
+            >
+              <div class="d-flex justify-space-between align-center px-4 pt-3">
+                <span class="schedule-title">{{ schedule.title }}</span>
+                <v-switch
+                  v-model="schedule.enabled"
+                  class="schedule-switch"
+                  :color="schedule.enabled ? 'success' : 'error'"
+                  hide-details
+                  @change="onScheduleSwitchChange(schedule)"
+                  @click.stop
                 />
               </div>
-            </div>
-          </div>
-          <div class="d-flex flex-row justify-space-between align-center px-4 pb-3 pt-1">
-            <v-btn
-              class="schedule-action-btn"
-              color="error"
-              variant="tonal"
-              @click.stop="deleteScheduleHandler(idx)"
-            >
-              <v-icon start>mdi-delete</v-icon>
-              Delete
-            </v-btn>
-            <v-btn
-              class="schedule-action-btn"
-              color="primary"
-              variant="tonal"
-              @click.stop="editSchedule(idx)"
-            >
-              <v-icon start>mdi-pencil</v-icon>
-              Edit
-            </v-btn>
-          </div>
-        </v-card>
+              <div class="d-flex flex-row align-center px-4 pb-2 pt-1" style="gap: 24px;">
+                <div class="d-flex flex-column align-start" style="min-width:120px;">
+                  <div><strong>Start:</strong> {{ formatTime(schedule.start) }}</div>
+                  <div><strong>End:</strong> {{ formatTime(schedule.end) }}</div>
+                </div>
+                <div class="flex-grow-1 d-flex align-center justify-center">
+                  <div class="profile-bar schedule-bar-graph">
+                    <div
+                      v-for="(val, i) in schedule.profile_values"
+                      :key="lights[i]"
+                      class="profile-bar-mini"
+                      :style="{ background: chipColors[lights[i]], height: (val || 0) + '%', opacity: 0.85 }"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex flex-row justify-space-between align-center px-4 pb-3 pt-1">
+                <v-btn
+                  class="schedule-action-btn"
+                  color="error"
+                  variant="tonal"
+                  @click.stop="deleteScheduleHandler(idx)"
+                >
+                  <v-icon start>mdi-delete</v-icon>
+                  Delete
+                </v-btn>
+                <v-btn
+                  class="schedule-action-btn"
+                  color="primary"
+                  variant="tonal"
+                  @click.stop="editSchedule(idx)"
+                >
+                  <v-icon start>mdi-pencil</v-icon>
+                  Edit
+                </v-btn>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
         <!-- Add Schedule Button -->
-        <v-btn
-          class="my-8"
-          color="primary"
-          size="x-large"
-          style="border-radius:50%; width:80px; aspect-ratio:1/1;"
-          variant="tonal"
-          @click="openCreateDialog"
-        >
-          <v-icon size="48">mdi-plus</v-icon>
-        </v-btn>
+        <div class="d-flex justify-center my-8">
+          <v-btn
+            color="primary"
+            size="x-large"
+            style="border-radius:50%; width:80px; aspect-ratio:1/1;"
+            variant="tonal"
+            @click="openCreateDialog"
+          >
+            <v-icon size="48">mdi-plus</v-icon>
+          </v-btn>
+        </div>
       </div>
 
       <!-- No Schedules: Big Plus -->
@@ -80,7 +89,7 @@
           variant="tonal"
           @click="openCreateDialog"
         >
-          <v-icon size="64">mdi-plus</v-icon>
+          <v-icon color="#bdbdbd" size="48">mdi-plus</v-icon>
         </v-btn>
       </div>
 
@@ -110,45 +119,47 @@
           </v-card-title>
           <v-card-text>
             <div class="mb-2 d-flex flex-column align-center">
-              <div class="d-flex align-center mb-2" style="gap: 12px;">
-                <span>Start:</span>
-                <v-btn
-                  color="success"
-                  style="min-width:80px;"
-                  variant="outlined"
-                  @click="showTimePicker('start')"
-                >
-                  {{ editScheduleData.start ? formatTime(editScheduleData.start) : 'Set Time' }}
-                </v-btn>
+              <div class="d-flex flex-column align-center mb-2" style="gap: 12px; width: 100%;">
+                <div class="d-flex flex-row align-center justify-center" style="gap: 12px; width: 100%;">
+                  <span style="min-width: 48px; text-align: left; font-weight: 500;">Start:</span>
+                  <v-btn
+                    color="success"
+                    style="min-width:100px; margin: 0 auto;"
+                    variant="outlined"
+                    @click="showTimePicker('start')"
+                  >
+                    {{ editScheduleData.start ? formatTime(editScheduleData.start) : 'Set Time' }}
+                  </v-btn>
+                </div>
+                <div class="d-flex flex-row align-center justify-center" style="gap: 12px; width: 100%;">
+                  <span style="min-width: 48px; text-align: left; font-weight: 500;">End:</span>
+                  <v-btn
+                    color="error"
+                    style="min-width:100px; margin: 0 auto;"
+                    variant="outlined"
+                    @click="showTimePicker('end')"
+                  >
+                    {{ editScheduleData.end ? formatTime(editScheduleData.end) : 'Set Time' }}
+                  </v-btn>
+                </div>
               </div>
-              <div class="d-flex align-center mb-2" style="gap: 12px;">
-                <span>End:</span>
-                <v-btn
-                  color="error"
-                  style="min-width:80px;"
-                  variant="outlined"
-                  @click="showTimePicker('end')"
-                >
-                  {{ editScheduleData.end ? formatTime(editScheduleData.end) : 'Set Time' }}
-                </v-btn>
-              </div>
-              <div class="d-flex flex-column align-center mb-2">
-                <span class="mb-1">Profile:</span>
-                <v-btn
-                  color="primary"
-                  style="min-width:120px;"
-                  variant="outlined"
-                  @click="profilePickerDialog = true"
-                >
-                  {{ editScheduleData.profile_name ? editScheduleData.profile_name : 'Select Profile' }}
-                </v-btn>
-                <div v-if="editScheduleData.profile_name" class="profile-preview profile-preview-center mt-2">
-                  <div
-                    v-for="(val, idx) in editScheduleData.profile_values"
-                    :key="lights[idx]"
-                    class="profile-bar-mini"
-                    :style="{ background: chipColors[lights[idx]], height: (val || 0) + '%', opacity: 0.85 }"
-                  />
+              <div class="d-flex flex-column align-center mb-2" style="width: 100%;">
+                <span class="mb-1" style="align-self: flex-start;">Profile:</span>
+                <div style="width: 100%; display: flex; justify-content: center;">
+                  <div v-if="!editScheduleData.profile_name" class="profile-card-blank" @click="profilePickerDialog = true">
+                    <v-icon color="#bdbdbd" size="48">mdi-plus</v-icon>
+                  </div>
+                  <div v-else class="profile-card-selected" @click="profilePickerDialog = true">
+                    <div class="profile-title-center" style="margin-bottom: 0;">{{ editScheduleData.profile_name }}</div>
+                    <div class="profile-preview profile-preview-center mt-2">
+                      <div
+                        v-for="(val, idx) in editScheduleData.profile_values"
+                        :key="lights[idx]"
+                        class="profile-bar-mini"
+                        :style="{ background: chipColors[lights[idx]], height: (val || 0) + '%', opacity: 0.85 }"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -493,6 +504,10 @@
   box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12);
   background: #fff;
   transition: box-shadow 0.2s, background 0.2s;
+  margin-bottom: 0;
+  min-width: 320px;
+  max-width: 420px;
+  width: 100%;
 }
 .schedule-card:hover {
   box-shadow: 0 12px 40px 0 rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.14);
@@ -592,5 +607,58 @@
   width: 10px;
   border-radius: 3px 3px 0 0;
   transition: height 0.3s;
+}
+.schedule-list-scroll {
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 24px 0 0 0;
+}
+.v-row.w-100 {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  row-gap: 32px;
+  column-gap: 0;
+  max-width: 900px;
+  justify-content: center;
+}
+.v-col.d-flex.justify-center {
+  padding-left: 24px !important;
+  padding-right: 24px !important;
+  box-sizing: border-box;
+}
+.profile-card-blank {
+  width: 220px;
+  height: 64px;
+  border-radius: 18px;
+  background: #f3f3f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  margin: 0 auto 8px auto;
+  transition: background 0.2s;
+}
+.profile-card-blank:hover {
+  background: #e0e0e0;
+}
+.profile-card-selected {
+  width: 220px;
+  min-height: 64px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0 auto 8px auto;
+  padding: 8px 0 4px 0;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+.profile-card-selected:hover {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+  background: #f7fafd;
 }
 </style>
