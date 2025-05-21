@@ -1,4 +1,4 @@
-import { ref, reactive, computed, watch } from 'vue'
+import { reactive, ref } from 'vue'
 
 // Singleton state
 const schedules = ref([])
@@ -10,7 +10,7 @@ let pingInterval = null
 let remotePingInterval = null
 let remoteCheckInterval = null
 
-function showAlert(message, type = 'success', timeout = 3000) {
+function showAlert (message, type = 'success', timeout = 3000) {
   alert.message = message
   alert.type = type
   alert.visible = true
@@ -18,28 +18,29 @@ function showAlert(message, type = 'success', timeout = 3000) {
   setTimeout(() => { alert.visible = false }, timeout)
 }
 
-async function fetchSchedules(BACKEND_URL) {
+async function fetchSchedules (BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`)
     if (!res.ok) throw new Error('Failed to fetch schedules')
-    schedules.value = await res.json()
-  } catch (e) {
+    const data = await res.json()
+    schedules.value = data.schedules || []
+  } catch {
     showAlert('Failed to fetch schedules', 'error')
   }
 }
 
-async function fetchProfiles(BACKEND_URL) {
+async function fetchProfiles (BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles`)
     if (!res.ok) throw new Error('Failed to fetch profiles')
     const data = await res.json()
     profiles.value = data.profiles || []
-  } catch (e) {
+  } catch {
     showAlert('Failed to fetch profiles', 'error')
   }
 }
 
-async function createSchedule(schedule, BACKEND_URL) {
+async function createSchedule (schedule, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`, {
       method: 'POST',
@@ -48,37 +49,41 @@ async function createSchedule(schedule, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to create schedule')
     await fetchSchedules(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to create schedule', 'error')
   }
 }
 
-async function updateSchedule(schedule, BACKEND_URL) {
+async function updateSchedule (schedule, BACKEND_URL) {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/schedules/${schedule.id}`, {
+    const res = await fetch(`${BACKEND_URL}/api/schedules`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(schedule),
     })
     if (!res.ok) throw new Error('Failed to update schedule')
     await fetchSchedules(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to update schedule', 'error')
   }
 }
 
-async function deleteSchedule(id, BACKEND_URL) {
+async function deleteSchedule (id, BACKEND_URL) {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/schedules/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${BACKEND_URL}/api/schedules`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
     if (!res.ok) throw new Error('Failed to delete schedule')
     await fetchSchedules(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to delete schedule', 'error')
   }
 }
 
 // Profile CRUD (implement as needed, similar to schedules)
-async function createProfile(profile, BACKEND_URL) {
+async function createProfile (profile, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles`, {
       method: 'POST',
@@ -87,12 +92,12 @@ async function createProfile(profile, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to create profile')
     await fetchProfiles(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to create profile', 'error')
   }
 }
 
-async function updateProfile(profile, BACKEND_URL) {
+async function updateProfile (profile, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles/${profile.name}`, {
       method: 'PUT',
@@ -101,17 +106,17 @@ async function updateProfile(profile, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to update profile')
     await fetchProfiles(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to update profile', 'error')
   }
 }
 
-async function deleteProfile(name, BACKEND_URL) {
+async function deleteProfile (name, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles/${name}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('Failed to delete profile')
     await fetchProfiles(BACKEND_URL)
-  } catch (e) {
+  } catch {
     showAlert('Failed to delete profile', 'error')
   }
 }
@@ -187,7 +192,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', stopPolling)
 }
 
-export function useGlobalState() {
+export function useGlobalState () {
   return {
     schedules,
     profiles,

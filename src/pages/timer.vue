@@ -175,8 +175,8 @@
         </v-card>
       </v-dialog>
 
-      <!-- Profile Picker Dialog for Schedules -->
-      <v-dialog v-model="profilePickerDialog" max-width="500" persistent>
+      <!-- Profile Picker Dialog for Schedules (EXACT MATCH TO index.vue) -->
+      <v-dialog v-model="profilePickerDialog" max-width="600" persistent>
         <v-card>
           <v-card-title>Select Profile</v-card-title>
           <v-card-text>
@@ -184,11 +184,14 @@
               <v-list-item
                 v-for="profile in profiles"
                 :key="profile.name"
-                style="cursor:pointer;"
+                class="profile-list-item profile-list-item-rounded"
+                :class="{'selected-profile': profile.name === editScheduleData.profile_name}"
+                elevation="4"
+                style="max-width:340px;margin:16px auto 0 auto;position:relative;"
                 @click="selectProfileForSchedule(profile)"
               >
                 <v-list-item-content>
-                  <v-list-item-title>{{ profile.name }}</v-list-item-title>
+                  <v-list-item-title class="profile-title-center">{{ profile.name }}</v-list-item-title>
                   <div class="profile-preview profile-preview-center">
                     <div
                       v-for="(val, idx) in profile.values"
@@ -198,6 +201,17 @@
                     />
                   </div>
                 </v-list-item-content>
+                <!-- Delete icon: middle left -->
+                <v-btn
+                  class="profile-action-btn profile-action-btn-delete"
+                  color="error"
+                  icon
+                  style="position:absolute;top:50%;transform:translateY(-50%);z-index:2;"
+                  variant="tonal"
+                  @click.stop="deleteProfileHandler(profile)"
+                >
+                  <v-icon>mdi-delete</v-icon>
+                </v-btn>
               </v-list-item>
             </v-list>
           </v-card-text>
@@ -268,6 +282,7 @@
     createSchedule,
     updateSchedule,
     deleteSchedule,
+    deleteProfile,
     showAlert,
   } = useGlobalState()
 
@@ -310,18 +325,12 @@
 
   const profilePickerDialog = ref(false)
 
-  let pollInterval = null
-
   onMounted(() => {
     fetchSchedules(BACKEND_URL)
     fetchProfiles(BACKEND_URL)
-    pollInterval = setInterval(() => {
-      fetchSchedules(BACKEND_URL)
-    }, 1000)
   })
 
   onUnmounted(() => {
-    if (pollInterval) clearInterval(pollInterval)
   })
 
   function formatTime (val) {
@@ -385,6 +394,7 @@
   async function deleteScheduleHandler (idx) {
     const schedule = schedules.value[idx]
     await deleteSchedule(schedule.id, BACKEND_URL)
+    await fetchSchedules(BACKEND_URL)
     closeEditDialog()
     showAlert('Schedule deleted', 'success')
   }
@@ -422,7 +432,7 @@
     updateSchedule(schedule, BACKEND_URL)
     showAlert('Schedule updated', 'success')
   }
-  function saveSchedule () {
+  async function saveSchedule () {
     for (let i = 0; i < schedules.value.length; i++) {
       if (editingIdx.value !== null && i === editingIdx.value) continue
       const s = schedules.value[i]
@@ -443,20 +453,27 @@
       showAlert('Please select a profile', 'error')
       return
     }
-    editScheduleData.profile_values = { ...selectedProfile.values }
+    editScheduleData.profile_values = [...selectedProfile.values]
     if (editingIdx.value === null) {
-      createSchedule({ ...editScheduleData }, BACKEND_URL)
+      await createSchedule({ ...editScheduleData }, BACKEND_URL)
       showAlert('Schedule created', 'success')
     } else {
-      updateSchedule({ ...editScheduleData }, BACKEND_URL)
+      await updateSchedule({ ...editScheduleData }, BACKEND_URL)
       showAlert('Schedule updated', 'success')
     }
+    await fetchSchedules(BACKEND_URL)
     closeEditDialog()
   }
   function selectProfileForSchedule (profile) {
     editScheduleData.profile_name = profile.name
     editScheduleData.profile_values = [...profile.values]
     profilePickerDialog.value = false
+  }
+  function deleteProfileHandler (profile) {
+    deleteProfile(profile.name, BACKEND_URL)
+      .then(() => fetchProfiles(BACKEND_URL))
+      .then(() => showAlert('Profile deleted', 'success'))
+      .catch(() => showAlert('Failed to delete profile', 'error'))
   }
 </script>
 
@@ -511,5 +528,69 @@
   font-size: 1em;
   padding: 0 18px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.selected-profile {
+  background: #e3f2fd !important;
+  border: 2px solid #1976d2 !important;
+}
+.profile-list-item {
+  background: #fff;
+  border-radius: 18px;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  transition: box-shadow 0.2s;
+  min-width: 0;
+  width: 340px;
+  max-width: 340px;
+  padding: 0 0 0 0;
+}
+.profile-list-item-rounded {
+  border-radius: 24px !important;
+}
+.profile-list-item:hover {
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.profile-action-btn {
+  min-width: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50% !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+  padding: 0;
+}
+.profile-action-btn-delete {
+  background: #fff !important;
+  border: 2px solid #ff5252 !important;
+}
+.profile-title-center {
+  text-align: center;
+  width: 100%;
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-bottom: 2px;
+  margin-top: 2px;
+}
+.profile-preview {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  height: 36px;
+  gap: 2px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+.profile-preview-center {
+  justify-content: center;
+  align-items: flex-end;
+  display: flex;
+  margin: 0 auto;
+}
+.profile-bar-mini {
+  width: 10px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s;
 }
 </style>
