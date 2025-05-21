@@ -4,38 +4,59 @@
       <!-- Schedules List -->
       <div v-if="schedules.length > 0" class="w-100 d-flex flex-column align-center">
         <v-card
-          v-for="(schedule, idx) in scheduleStore.schedules"
+          v-for="(schedule, idx) in schedules"
           :key="schedule.id"
-          class="mb-4"
-          elevation="4"
-          style="cursor:pointer; position:relative;"
-          width="400"
-          @click="editSchedule(idx)"
+          class="mb-4 schedule-card"
+          elevation="6"
+          style="width: 420px; border-radius: 24px; position:relative;"
         >
-          <v-card-title class="d-flex justify-space-between align-center">
-            <span>{{ schedule.title }}</span>
+          <div class="d-flex justify-space-between align-center px-4 pt-3">
+            <span class="schedule-title">{{ schedule.title }}</span>
             <v-switch
               v-model="schedule.enabled"
+              class="schedule-switch"
               :color="schedule.enabled ? 'success' : 'error'"
               hide-details
-              @change="onScheduleSwitchChange"
+              @change="onScheduleSwitchChange(schedule)"
               @click.stop
             />
-          </v-card-title>
-          <v-card-text>
-            <div class="mb-2">
-              <strong>Start:</strong> {{ formatTime(schedule.start) }}<br>
-              <strong>End:</strong> {{ formatTime(schedule.end) }}
+          </div>
+          <div class="d-flex flex-row align-center px-4 pb-2 pt-1" style="gap: 24px;">
+            <div class="d-flex flex-column align-start" style="min-width:120px;">
+              <div><strong>Start:</strong> {{ formatTime(schedule.start) }}</div>
+              <div><strong>End:</strong> {{ formatTime(schedule.end) }}</div>
             </div>
-            <v-chip-group column multiple>
-              <v-chip
-                v-for="light in schedule.lights"
-                :key="light"
-                class="ma-1"
-                color="primary"
-              >{{ light }}</v-chip>
-            </v-chip-group>
-          </v-card-text>
+            <div class="flex-grow-1 d-flex align-center justify-center">
+              <div class="profile-bar schedule-bar-graph">
+                <div
+                  v-for="(val, i) in schedule.profile_values"
+                  :key="lights[i]"
+                  class="profile-bar-mini"
+                  :style="{ background: chipColors[lights[i]], height: (val || 0) + '%', opacity: 0.85 }"
+                />
+              </div>
+            </div>
+          </div>
+          <div class="d-flex flex-row justify-space-between align-center px-4 pb-3 pt-1">
+            <v-btn
+              class="schedule-action-btn"
+              color="error"
+              variant="tonal"
+              @click.stop="deleteScheduleHandler(idx)"
+            >
+              <v-icon start>mdi-delete</v-icon>
+              Delete
+            </v-btn>
+            <v-btn
+              class="schedule-action-btn"
+              color="primary"
+              variant="tonal"
+              @click.stop="editSchedule(idx)"
+            >
+              <v-icon start>mdi-pencil</v-icon>
+              Edit
+            </v-btn>
+          </div>
         </v-card>
         <!-- Add Schedule Button -->
         <v-btn
@@ -111,24 +132,25 @@
                   {{ editScheduleData.end ? formatTime(editScheduleData.end) : 'Set Time' }}
                 </v-btn>
               </div>
-              <v-chip-group
-                v-model="editScheduleData.lights"
-                class="mb-2 d-flex flex-wrap justify-center"
-                column
-                multiple
-              >
-                <v-chip
-                  v-for="light in lights"
-                  :key="light"
-                  class="ma-1"
+              <div class="d-flex flex-column align-center mb-2">
+                <span class="mb-1">Profile:</span>
+                <v-btn
                   color="primary"
-                  size="small"
-                  :value="light"
-                  :variant="editScheduleData.lights.includes(light) ? 'elevated' : 'outlined'"
+                  style="min-width:120px;"
+                  variant="outlined"
+                  @click="profilePickerDialog = true"
                 >
-                  {{ light }}
-                </v-chip>
-              </v-chip-group>
+                  {{ editScheduleData.profile_name ? editScheduleData.profile_name : 'Select Profile' }}
+                </v-btn>
+                <div v-if="editScheduleData.profile_name" class="profile-preview profile-preview-center mt-2">
+                  <div
+                    v-for="(val, idx) in editScheduleData.profile_values"
+                    :key="lights[idx]"
+                    class="profile-bar-mini"
+                    :style="{ background: chipColors[lights[idx]], height: (val || 0) + '%', opacity: 0.85 }"
+                  />
+                </div>
+              </div>
             </div>
           </v-card-text>
           <v-card-actions>
@@ -137,7 +159,7 @@
               class="mr-auto"
               color="error"
               variant="tonal"
-              @click="deleteSchedule(editingIdx)"
+              @click="deleteScheduleHandler(editingIdx)"
             >
               <v-icon start>mdi-delete</v-icon>
               Delete
@@ -149,6 +171,39 @@
               @click="saveSchedule"
             >Save</v-btn>
             <v-btn @click="closeEditDialog">Cancel</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- Profile Picker Dialog for Schedules -->
+      <v-dialog v-model="profilePickerDialog" max-width="500" persistent>
+        <v-card>
+          <v-card-title>Select Profile</v-card-title>
+          <v-card-text>
+            <v-list>
+              <v-list-item
+                v-for="profile in profiles"
+                :key="profile.name"
+                style="cursor:pointer;"
+                @click="selectProfileForSchedule(profile)"
+              >
+                <v-list-item-content>
+                  <v-list-item-title>{{ profile.name }}</v-list-item-title>
+                  <div class="profile-preview profile-preview-center">
+                    <div
+                      v-for="(val, idx) in profile.values"
+                      :key="lights[idx]"
+                      class="profile-bar-mini"
+                      :style="{ background: chipColors[lights[idx]], height: (val || 0) + '%', opacity: 0.8 }"
+                    />
+                  </div>
+                </v-list-item-content>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn text @click="profilePickerDialog = false">Close</v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
@@ -200,15 +255,22 @@
 
 <script setup>
   import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
-  import { useScheduleStore } from '@/stores/scheduleStore'
+  import { useGlobalState } from '@/plugins/globalState'
 
   const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+  const BACKEND_URL = `http://${window.location.hostname}:8080`
 
-  const BACKEND_URL = `http://${window.location.hostname}:8080` // Device IP address
+  const {
+    schedules,
+    profiles,
+    fetchSchedules,
+    fetchProfiles,
+    createSchedule,
+    updateSchedule,
+    deleteSchedule,
+    showAlert,
+  } = useGlobalState()
 
-  const scheduleStore = useScheduleStore()
-
-  const schedules = ref([]) // {id, title, start, end, lights, enabled}
   const createDialog = ref(false)
   const editDialog = ref(false)
   const editingIdx = ref(null)
@@ -219,6 +281,8 @@
     end: null,
     lights: [],
     enabled: true,
+    profile_name: '',
+    profile_values: {},
   })
 
   const timePickerDialog = reactive({
@@ -235,136 +299,55 @@
     overlap: '',
   })
 
+  const chipColors = {
+    IR: '#b71c1c',
+    Red: '#ff5252',
+    Green: '#4caf50',
+    Blue: '#2196f3',
+    White: '#bdbdbd',
+    UV: '#7c4dff',
+  }
+
+  const profilePickerDialog = ref(false)
+
   let pollInterval = null
 
-  async function loadSchedulesFromBackend () {
-    const res = await fetch(`${BACKEND_URL}/api/state`)
-    const data = await res.json()
-    if (data.scheduleData && Array.isArray(data.scheduleData.schedules)) {
-      const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
-      schedules.value = data.scheduleData.schedules.map(arr => ({
-        enabled: arr[0],
-        start: toTimeString(arr[1]),
-        end: toTimeString(arr[2]),
-        lights: lightOrder.filter((l, i) => arr[3 + i]),
-        title: 'Untitled Schedule',
-      }))
-    } else {
-      schedules.value = []
-    }
-  }
-  // Persistence: Load from localStorage on mount, save on change
   onMounted(() => {
-
-    if (scheduleStore.schedules.length === 0) {
-      scheduleStore.fetchSchedules(BACKEND_URL)
-    }
-
-    // Poll for schedule state updates (for all clients)
-    pollInterval = setInterval(async () => {
-      try {
-        scheduleStore.fetchSchedules(BACKEND_URL)
-        const res = await fetch(`${BACKEND_URL}/api/state`)
-        const data = await res.json()
-        if (data.scheduleData && Array.isArray(data.scheduleData.schedules)) {
-          const newSchedules = JSON.stringify(data.scheduleData.schedules)
-          const currentSchedules = JSON.stringify(formatSchedulesForBackend(schedules.value))
-          if (newSchedules !== currentSchedules) {
-            const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
-            schedules.value = data.scheduleData.schedules.map(arr => ({
-              enabled: arr[0],
-              start: toTimeString(arr[1]),
-              end: toTimeString(arr[2]),
-              lights: lightOrder.filter((l, i) => arr[3 + i]),
-              title: 'Untitled Schedule',
-            }))
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching schedule state:', err)
-      }
+    fetchSchedules(BACKEND_URL)
+    fetchProfiles(BACKEND_URL)
+    pollInterval = setInterval(() => {
+      fetchSchedules(BACKEND_URL)
     }, 1000)
-
-    // On mount, fetch schedules from backend instead of localStorage
-    loadSchedulesFromBackend()
   })
 
   onUnmounted(() => {
     if (pollInterval) clearInterval(pollInterval)
   })
 
-  // Helper to convert military time integer to "HH:MM:AM/PM" string
-  function toTimeString (military) {
-    if (!military && military !== 0) return null
-    let h = Math.floor(military / 100)
-    const m = military % 100
-    let ampm = 'AM'
-    if (h === 0) {
-      h = 12
-    } else if (h === 12) {
-      ampm = 'PM'
-    } else if (h > 12) {
-      h -= 12
-      ampm = 'PM'
-    }
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${ampm}`
+  function formatTime (val) {
+    if (!val) return '--:--'
+    const [h, m, ampm] = val.split(':')
+    return `${h.padStart(2, '0')}:${m.padStart(2, '0')} ${ampm}`
   }
 
-  // Change formatting to simplify backend processing
-  function formatSchedulesForBackend (schedules) {
-    // Light order: IR, R, G, B, W, UV
-    const lightOrder = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+  const canSave = computed(() =>
+    editScheduleData.title &&
+    editScheduleData.start &&
+    editScheduleData.end &&
+    editScheduleData.profile_name
+  )
 
-    function toMilitaryTime (str) {
-      if (!str) return 0
-      let [h, m, ampm] = str.split(':')
+  function timesOverlap (start1, end1, start2, end2) {
+    const toMin = t => {
+      let [h, m, ampm] = t.split(':')
       h = parseInt(h)
       m = parseInt(m)
       if (ampm === 'PM' && h !== 12) h += 12
       if (ampm === 'AM' && h === 12) h = 0
-      return (h * 100) + m
+      return h * 60 + m
     }
-
-    return schedules.map(s => [
-      !!s.enabled,
-      toMilitaryTime(s.start),
-      toMilitaryTime(s.end),
-      ...lightOrder.map(light => s.lights && s.lights.includes(light)),
-    ])
-  }
-
-  // Get lighting values from local storage to prevent sending null values
-  function getLightingFromStorage () {
-    // Should match the order [IR, R, G, B, W, UV]
-    const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
-    const saved = JSON.parse(localStorage.getItem('lightSliderValues') || '{}')
-    return order.map(k => Number(saved[k]) || 0)
-  }
-
-  async function sendStateToBackend (lighting, scheduleData) {
-    const response = await fetch(`${BACKEND_URL}/api/state`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lighting,
-        scheduleData,
-      }),
-    })
-    const result = await response.json()
-    console.log('Backend response:', result) // Debug print
-  }
-
-  function onScheduleSwitchChange () {
-    // Save to localStorage
-    localStorage.setItem('schedules', JSON.stringify(schedules.value))
-    // Send updated state to backend
-    sendStateToBackend(
-      getLightingFromStorage(),
-      {
-        scheduleCount: schedules.value.length,
-        schedules: formatSchedulesForBackend(schedules.value),
-      }
-    )
+    const s1 = toMin(start1), e1 = toMin(end1), s2 = toMin(start2), e2 = toMin(end2)
+    return Math.max(s1, s2) < Math.min(e1, e2)
   }
 
   function openCreateDialog () {
@@ -378,7 +361,6 @@
     editDialog.value = true
     editingIdx.value = idx
     if (idx === null) {
-      // New
       Object.assign(editScheduleData, {
         id: Date.now(),
         title: 'Untitled Schedule',
@@ -386,9 +368,10 @@
         end: null,
         lights: [],
         enabled: true,
+        profile_name: '',
+        profile_values: {},
       })
     } else {
-      // Edit existing
       Object.assign(editScheduleData, JSON.parse(JSON.stringify(schedules.value[idx])))
     }
   }
@@ -399,17 +382,11 @@
   function editSchedule (idx) {
     openEditDialog(idx)
   }
-  async function deleteSchedule (idx) {
-    schedules.value.splice(idx, 1)
+  async function deleteScheduleHandler (idx) {
+    const schedule = schedules.value[idx]
+    await deleteSchedule(schedule.id, BACKEND_URL)
     closeEditDialog()
-    await sendStateToBackend(
-      getLightingFromStorage(),
-      {
-        scheduleCount: schedules.value.length,
-        schedules: formatSchedulesForBackend(schedules.value),
-      }
-    )
-    await loadSchedulesFromBackend()
+    showAlert('Schedule deleted', 'success')
   }
   function showTimePicker (type) {
     timePickerDialog.type = type
@@ -430,41 +407,27 @@
   function confirmTimePicker () {
     let [h, m] = timePickerDialog.time.split(':').map(Number)
     const ampm = timePickerDialog.ampm
-
-    // Convert 24h to 12h based on AM/PM toggle
     if (ampm === 'AM') {
       if (h === 0) h = 12
       if (h > 12) h -= 12
-    } else { // PM
+    } else {
       if (h === 0) h = 12
       if (h < 12) h += 12
-      if (h > 12) h -= 12 // Prevent 24h overflow
+      if (h > 12) h -= 12
     }
-
-    // Always store as 2-digit hour
     editScheduleData[timePickerDialog.type] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${ampm}`
     timePickerDialog.visible = false
   }
-  function formatTime (val) {
-    if (!val) return '--:--'
-    const [h, m, ampm] = val.split(':')
-    return `${h.padStart(2, '0')}:${m.padStart(2, '0')} ${ampm}`
+  function onScheduleSwitchChange (schedule) {
+    updateSchedule(schedule, BACKEND_URL)
+    showAlert('Schedule updated', 'success')
   }
-  const canSave = computed(() =>
-    editScheduleData.title &&
-    editScheduleData.start &&
-    editScheduleData.end &&
-    editScheduleData.lights.length > 0
-  )
-
   function saveSchedule () {
-    // Conflict check
     for (let i = 0; i < schedules.value.length; i++) {
       if (editingIdx.value !== null && i === editingIdx.value) continue
       const s = schedules.value[i]
       for (const light of editScheduleData.lights) {
         if (s.lights.includes(light)) {
-          // Check time overlap
           if (timesOverlap(editScheduleData.start, editScheduleData.end, s.start, s.end)) {
             conflictDialog.chip = light
             conflictDialog.conflictTitle = s.title
@@ -475,32 +438,25 @@
         }
       }
     }
+    const selectedProfile = profiles.value.find(p => p.name === editScheduleData.profile_name)
+    if (!selectedProfile) {
+      showAlert('Please select a profile', 'error')
+      return
+    }
+    editScheduleData.profile_values = { ...selectedProfile.values }
     if (editingIdx.value === null) {
-      schedules.value.push(JSON.parse(JSON.stringify(editScheduleData)))
+      createSchedule({ ...editScheduleData }, BACKEND_URL)
+      showAlert('Schedule created', 'success')
     } else {
-      schedules.value[editingIdx.value] = JSON.parse(JSON.stringify(editScheduleData))
+      updateSchedule({ ...editScheduleData }, BACKEND_URL)
+      showAlert('Schedule updated', 'success')
     }
     closeEditDialog()
-    sendStateToBackend(
-      getLightingFromStorage(), // <-- see below
-      {
-        scheduleCount: schedules.value.length,
-        schedules: formatSchedulesForBackend(schedules.value),
-      }
-    )
   }
-  function timesOverlap (start1, end1, start2, end2) {
-    // Convert to minutes since midnight
-    const toMin = t => {
-      let [h, m, ampm] = t.split(':')
-      h = parseInt(h)
-      m = parseInt(m)
-      if (ampm === 'PM' && h !== 12) h += 12
-      if (ampm === 'AM' && h === 12) h = 0
-      return h * 60 + m
-    }
-    const s1 = toMin(start1), e1 = toMin(end1), s2 = toMin(start2), e2 = toMin(end2)
-    return Math.max(s1, s2) < Math.min(e1, e2)
+  function selectProfileForSchedule (profile) {
+    editScheduleData.profile_name = profile.name
+    editScheduleData.profile_values = [...profile.values]
+    profilePickerDialog.value = false
   }
 </script>
 
@@ -513,5 +469,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.schedule-card {
+  border-radius: 24px !important;
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12);
+  background: #fff;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+.schedule-card:hover {
+  box-shadow: 0 12px 40px 0 rgba(0,0,0,0.22), 0 4px 16px rgba(0,0,0,0.14);
+  background: #f7fafd;
+}
+.schedule-title {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #222;
+  letter-spacing: 0.5px;
+}
+.schedule-switch {
+  margin-left: 8px;
+}
+.schedule-bar-graph {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  height: 38px;
+  gap: 3px;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.profile-bar-mini {
+  width: 14px;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s;
+}
+.schedule-action-btn {
+  min-width: 0;
+  border-radius: 12px !important;
+  font-weight: 500;
+  font-size: 1em;
+  padding: 0 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
 </style>

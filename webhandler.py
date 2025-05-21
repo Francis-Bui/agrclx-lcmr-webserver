@@ -1,19 +1,28 @@
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
+import eventlet
 import time
 import os
 import json
 import threading
 
+eventlet.monkey_patch()
+
 app = Flask(__name__, static_folder='templates/assets')
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 STATE_FILE = 'state.json'
 PROFILE_DIR = os.path.expanduser("~/Desktop/profiles")
 PROFILE_LOCK = threading.Lock()
 
-# Ensure profile directory exists
+SCHEDULE_DIR = os.path.expanduser("~/Desktop/schedules")
+SCHEDULE_LOCK = threading.Lock()
+
+# Ensure profile and schedule directories exist
 os.makedirs(PROFILE_DIR, exist_ok=True)
+os.makedirs(SCHEDULE_DIR, exist_ok=True)
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -54,6 +63,38 @@ def lock_status():
         "local_lock": (time.time() - last_local_interaction < LOCAL_LOCK_TIMEOUT)
     })
 
+LIGHTING_COND = threading.Condition()
+
+@app.route('/api/slider/longpoll', methods=['GET'])
+def slider_longpoll():
+    global lighting_values
+    # Get last known values from client (optional, for optimization)
+    last = request.args.get('last')
+    try:
+        last = json.loads(last) if last else None
+    except Exception:
+        last = None
+    timeout = 20  # seconds
+    start = time.time()
+    def norm(vals):
+        if not isinstance(vals, list):
+            return None
+        return [float(x) for x in vals]
+    with LIGHTING_COND:
+        while True:
+            norm_last = norm(last)
+            norm_current = norm(lighting_values)
+            # Debug print
+            # print(f"[LONGPOLL] Comparing last={norm_last} current={norm_current}")
+            if norm_last is None or norm_current != norm_last:
+                break
+            remaining = timeout - (time.time() - start)
+            if remaining <= 0:
+                break
+            LIGHTING_COND.wait(timeout=remaining)
+        # Return current lighting values
+        return jsonify({"lighting": lighting_values})
+
 @app.route('/api/state', methods=['GET', 'POST'])
 def state():
     global last_local_interaction, lighting_values, schedules
@@ -70,11 +111,19 @@ def state():
                 return jsonify({"status": "locked", "message": "Manual interface in use"}), 423
             print("[REMOTE] Received from frontend:", data)
         # Update global state
+        lighting_changed = False
         if data.get('lighting'):
+            if data['lighting'] != lighting_values:
+                lighting_changed = True
             lighting_values = data['lighting']
         if data.get('scheduleData') and data['scheduleData']:
             schedules = data['scheduleData']['schedules']
         save_state(lighting_values, schedules)
+        if lighting_changed:
+            with LIGHTING_COND:
+                LIGHTING_COND.notify_all()
+            # Emit slider update to all websocket clients
+            socketio.emit('slider_update', {'lighting': lighting_values})
         return jsonify({"status": "ok", "received": data})
     else:
         schedule_dict = {
@@ -150,5 +199,96 @@ def profiles():
             except Exception as e:
                 return jsonify({"error": str(e)}), 500
 
+def list_schedules():
+    schedules = []
+    for fname in os.listdir(SCHEDULE_DIR):
+        if fname.endswith(".json"):
+            try:
+                with open(os.path.join(SCHEDULE_DIR, fname), 'r') as f:
+                    data = json.load(f)
+                    schedules.append(data)
+            except Exception:
+                continue
+    return schedules
+
+@app.route('/api/schedules', methods=['GET', 'POST', 'PUT', 'DELETE'])
+def schedules_api():
+    """
+    GET: List all schedules
+    POST: Create new schedule {title, start, end, profile_name, profile_values, enabled}
+    PUT: Edit schedule {id, ...fields}
+    DELETE: Delete schedule {id}
+    """
+    if request.method == 'GET':
+        try:
+            with SCHEDULE_LOCK:
+                schedules = list_schedules()
+            return jsonify({'schedules': schedules}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        data = request.get_json()
+        required = ['title', 'start', 'end', 'profile_name', 'profile_values', 'enabled']
+        if not all(k in data for k in required):
+            return jsonify({'error': 'Missing fields'}), 400
+        schedule_id = str(int(time.time() * 1000))
+        fname = os.path.join(SCHEDULE_DIR, f'{schedule_id}.json')
+        schedule = {
+            'id': schedule_id,
+            'title': data['title'],
+            'start': data['start'],
+            'end': data['end'],
+            'profile_name': data['profile_name'],
+            'profile_values': data['profile_values'],
+            'enabled': data['enabled']
+        }
+        with SCHEDULE_LOCK:
+            try:
+                with open(fname, 'w') as f:
+                    json.dump(schedule, f)
+                return jsonify({'status': 'created', 'schedule': schedule}), 201
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'PUT':
+        data = request.get_json()
+        schedule_id = data.get('id')
+        if not schedule_id:
+            return jsonify({'error': 'Missing id'}), 400
+        fname = os.path.join(SCHEDULE_DIR, f'{schedule_id}.json')
+        with SCHEDULE_LOCK:
+            if not os.path.exists(fname):
+                return jsonify({'error': 'Schedule not found'}), 404
+            try:
+                with open(fname, 'w') as f:
+                    json.dump(data, f)
+                return jsonify({'status': 'updated', 'schedule': data}), 200
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        data = request.get_json()
+        schedule_id = data.get('id')
+        if not schedule_id:
+            return jsonify({'error': 'Missing id'}), 400
+        fname = os.path.join(SCHEDULE_DIR, f'{schedule_id}.json')
+        with SCHEDULE_LOCK:
+            if not os.path.exists(fname):
+                return jsonify({'error': 'Schedule not found'}), 404
+            try:
+                os.remove(fname)
+                return jsonify({'status': 'deleted'}), 200
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+@socketio.on('connect')
+def handle_connect():
+    emit('slider_update', {'lighting': lighting_values})
+
+@socketio.on('get_state')
+def handle_get_state():
+    emit('slider_update', {'lighting': lighting_values})
+
 if __name__ == '__main__':
-    app.run(host = '0.0.0.0', debug=True, port=8080)
+    socketio.run(app, host = '0.0.0.0', debug=True, port=8080)

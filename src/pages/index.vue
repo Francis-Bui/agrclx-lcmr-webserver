@@ -123,7 +123,7 @@
                 icon
                 style="position:absolute;top:50%;transform:translateY(-50%);z-index:2;"
                 variant="tonal"
-                @click.stop="deleteProfile(profile)"
+                @click.stop="handleDeleteProfile(profile)"
               >
                 <v-icon>mdi-delete</v-icon>
               </v-btn>
@@ -147,7 +147,9 @@
 </template>
 
 <script setup>
-  import { onUnmounted, reactive, ref } from 'vue'
+  import { onMounted, onUnmounted, reactive, ref } from 'vue'
+  import { useGlobalState } from '@/plugins/globalState.js'
+  import { io } from 'socket.io-client'
 
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
   const BACKEND_URL = `http://${window.location.hostname}:8080`
@@ -163,29 +165,64 @@
   })
 
   const chipColors = {
-    IR: '#b71c1c', // Dark red
+    IR: '#b71c1c',
     Red: '#ff5252',
     Green: '#4caf50',
     Blue: '#2196f3',
-    White: '#bdbdbd', // Light grey for white bar
+    White: '#bdbdbd',
     UV: '#7c4dff',
   }
 
-  // Profile system
+  // Use global state composable
+  const {
+    profiles,
+    alert,
+    fetchProfiles,
+    createProfile,
+    deleteProfile,
+    showAlert,
+  } = useGlobalState()
+
+  // Dialogs and UI state
   const dialogs = reactive({ save: false, load: false })
-  const profiles = ref([])
   const profileName = ref('')
 
-  // Alert system
-  const alert = reactive({ show: false, message: '', type: 'success' })
-  let alertTimeout = null
-  function showAlert (msg, type = 'success') {
-    alert.message = msg
-    alert.type = type
-    alert.show = true
-    if (alertTimeout) clearTimeout(alertTimeout)
-    alertTimeout = setTimeout(() => (alert.show = false), 2200)
+  const resetSpinning = ref(false)
+  function resetSliders () {
+    if (lockStatus.local_lock) return
+    Object.keys(sliderValues).forEach(k => sliderValues[k] = 0)
+    sendSlidersToBackend()
+    resetSpinning.value = true
+    setTimeout(() => { resetSpinning.value = false }, 700)
+    showAlert('All lights reset to 0%', 'success')
   }
+
+  const socket = ref(null)
+
+  onMounted(() => {
+    // Connect to backend WebSocket
+    socket.value = io(BACKEND_URL)
+    socket.value.on('connect', () => {
+      // Optionally show connection status
+    })
+    socket.value.on('slider_update', data => {
+      if (data && Array.isArray(data.lighting)) {
+        const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
+        order.forEach((k, i) => {
+          sliderValues[k] = data.lighting[i]
+        })
+      }
+    })
+    // On connect, request current state (optional)
+    socket.value.emit('get_state')
+  })
+
+  onUnmounted(() => {
+    if (socket.value) {
+      socket.value.disconnect()
+      socket.value = null
+    }
+  })
 
   function openSaveDialog () {
     profileName.value = ''
@@ -195,66 +232,33 @@
     dialogs.save = false
   }
   function openLoadDialog () {
-    fetchProfiles()
+    fetchProfiles(BACKEND_URL) // Only fetch when dialog opens
     dialogs.load = true
   }
   function closeLoadDialog () {
     dialogs.load = false
   }
 
-  function saveProfile () {
+  async function saveProfile () {
     const payload = {
       name: profileName.value,
       values: chips.map(k => Number(sliderValues[k]) || 0),
     }
-    fetch(`${BACKEND_URL}/api/profiles`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-      .then(async res => {
-        if (res.ok) {
-          showAlert('Profile saved!', 'success')
-          fetchProfiles()
-          dialogs.save = false
-        } else if (res.status === 409) {
-          showAlert('Profile name already exists!', 'warning')
-        } else {
-          showAlert('Failed to save profile', 'error')
-        }
-      })
-  }
-
-  function fetchProfiles () {
-    fetch(`${BACKEND_URL}/api/profiles`)
-      .then(res => res.json())
-      .then(data => {
-        profiles.value = data.profiles || []
-      })
+    await createProfile(payload, BACKEND_URL)
+    fetchProfiles(BACKEND_URL) // Refresh after create
+    dialogs.save = false
   }
 
   function selectProfile (profile) {
-    // Load profile values into sliders
     chips.forEach((k, i) => (sliderValues[k] = profile.values[i]))
     sendSlidersToBackend()
     dialogs.load = false
     showAlert('Profile loaded!', 'success')
   }
 
-  function deleteProfile (profile) {
-    fetch(`${BACKEND_URL}/api/profiles`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: profile.name }),
-    })
-      .then(async res => {
-        if (res.ok) {
-          showAlert('Profile deleted!', 'success')
-          fetchProfiles()
-        } else {
-          showAlert('Failed to delete profile', 'error')
-        }
-      })
+  async function handleDeleteProfile (profile) {
+    await deleteProfile(profile.name, BACKEND_URL)
+    fetchProfiles(BACKEND_URL) // Refresh after delete
   }
 
   function sendSlidersToBackend () {
@@ -267,99 +271,13 @@
 
   function onSliderChange () {
     sendSlidersToBackend()
+    // Do not update UI here; wait for WebSocket event
   }
 
   function getLightingArrayFromSliders () {
     const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
     return order.map(k => Number(sliderValues[k]) || 0)
   }
-
-  // Live state polling logic: only poll if a remote (non-localhost) client is present
-  const pollInterval = ref(null)
-
-  // Each client uses a unique index (0-4) for up to 5 clients
-  function updateClientPing () {
-    const now = Date.now()
-    let myIdx = -1
-    for (let i = 0; i < 5; i++) {
-      const t = localStorage.getItem('data_vue_client_ping_' + i)
-      if (!t || now - Number(t) > 2000) {
-        myIdx = i
-        break
-      }
-    }
-    if (myIdx === -1) myIdx = Math.floor(Math.random() * 5)
-    localStorage.setItem('data_vue_client_ping_' + myIdx, now)
-    return myIdx
-  }
-
-  updateClientPing()
-  const pingInterval = setInterval(() => {
-    updateClientPing()
-  }, 1000)
-
-  // Only poll state if a remote client is detected (not localhost)
-  function isRemoteClientPresent () {
-    // Use a localStorage key to indicate remote presence
-    // Each remote client sets 'data_vue_remote_ping' every second
-    // Localhost does not set this key
-    const now = Date.now()
-    const remotePing = localStorage.getItem('data_vue_remote_ping')
-    return remotePing && now - Number(remotePing) < 2200
-  }
-
-  function updateRemotePing () {
-    // Only set if not localhost
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      localStorage.setItem('data_vue_remote_ping', Date.now())
-    }
-  }
-
-  // Set remote ping if this is a remote client
-  updateRemotePing()
-  const remotePingInterval = setInterval(() => {
-    updateRemotePing()
-  }, 1000)
-
-  function startPollingState () {
-    if (pollInterval.value) return
-    pollInterval.value = setInterval(async () => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/state`)
-        const data = await res.json()
-        if (data.lighting) {
-          const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
-          order.forEach((k, i) => {
-            sliderValues[k] = data.lighting[i]
-          })
-        }
-      } catch {
-        // ignore
-      }
-    }, 1000)
-  }
-  function stopPollingState () {
-    if (pollInterval.value) {
-      clearInterval(pollInterval.value)
-      pollInterval.value = null
-    }
-  }
-
-  // Check for remote client presence and poll accordingly
-  const remoteCheckInterval = setInterval(() => {
-    if (isRemoteClientPresent()) {
-      startPollingState()
-    } else {
-      stopPollingState()
-    }
-  }, 1200)
-
-  onUnmounted(() => {
-    if (pollInterval.value) clearInterval(pollInterval.value)
-    if (pingInterval) clearInterval(pingInterval)
-    if (remotePingInterval) clearInterval(remotePingInterval)
-    if (remoteCheckInterval) clearInterval(remoteCheckInterval)
-  })
 
   function getBoxStyle (chip) {
     const color = chipColors[chip]
@@ -385,22 +303,11 @@
       0 0 ${90 + 80 * intensity}px 30px rgba(${r},${g},${b},${auraAlpha * 0.4})
     `
     }
-    // Add strong elevation
     boxShadow += ', 0 8px 32px 0 rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12)';
     return {
       boxShadow,
       animation: `pulse 1.2s infinite alternate`,
     }
-  }
-
-  const resetSpinning = ref(false)
-  function resetSliders () {
-    if (lockStatus.local_lock) return
-    Object.keys(sliderValues).forEach(k => sliderValues[k] = 0)
-    sendSlidersToBackend()
-    resetSpinning.value = true
-    setTimeout(() => { resetSpinning.value = false }, 700)
-    showAlert('All lights reset to 0%', 'success')
   }
 </script>
 
@@ -496,7 +403,6 @@
   box-shadow: 0 4px 24px rgba(0,0,0,0.18);
   text-align: center;
   opacity: 0.97;
-  transition: transform 0s;
 }
 .alert.success { background: #4caf50; color: #fff; }
 .alert.error { background: #ff5252; color: #fff; }

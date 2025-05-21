@@ -6,6 +6,13 @@
       </transition>
     </v-main>
 
+    <!-- Global Alert Bar -->
+    <transition name="bounce-fade">
+      <div v-if="alert.visible" :class="['alert', alert.type]">
+        {{ alert.message }}
+      </div>
+    </transition>
+
     <!-- Manual Popup Dialog -->
     <v-dialog v-model="showManualPopup" max-width="320" persistent>
       <v-card class="text-center" color="warning">
@@ -44,6 +51,9 @@
 <script setup>
   import { onMounted, onUnmounted, ref, watch } from 'vue'
   import { useRoute } from 'vue-router'
+  import { useGlobalState } from '@/plugins/globalState.js'
+
+  const { alert } = useGlobalState()
 
   const showManualPopup = ref(false)
   const BACKEND_URL = `http://${window.location.hostname}:8080`
@@ -77,7 +87,7 @@
 
   watch(
     () => route.path,
-    (to, from) => {
+    to => {
       const fromIdx = lastIndex.value
       const toIdx = pageOrder.indexOf(to)
       transitionName.value = toIdx > fromIdx ? 'slide-left' : 'slide-right'
@@ -133,6 +143,41 @@
 .slide-right-enter-from,
 .slide-left-leave-to {
   transform: translateX(-100%) !important;
+}
+
+.alert {
+  position: fixed;
+  left: 50%;
+  bottom: 90px;
+  transform: translateX(-50%);
+  min-width: 220px;
+  max-width: 90vw;
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-weight: bold;
+  font-size: 1.1em;
+  z-index: 9999;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  text-align: center;
+  opacity: 0.97;
+}
+.alert.success { background: #4caf50; color: #fff; }
+.alert.error { background: #ff5252; color: #fff; }
+.alert.warning { background: #ffb300; color: #333; }
+.bounce-fade-enter-active {
+  animation: bounce-in 0.5s;
+}
+.bounce-fade-leave-active {
+  animation: fade-out 0.4s;
+}
+@keyframes bounce-in {
+  0% { opacity: 0; transform: translateY(40px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-8px) scale(1.05); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 </style>
