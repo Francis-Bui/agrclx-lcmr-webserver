@@ -65,36 +65,6 @@ def lock_status():
 
 LIGHTING_COND = threading.Condition()
 
-@app.route('/api/slider/longpoll', methods=['GET'])
-def slider_longpoll():
-    global lighting_values
-    # Get last known values from client (optional, for optimization)
-    last = request.args.get('last')
-    try:
-        last = json.loads(last) if last else None
-    except Exception:
-        last = None
-    timeout = 20  # seconds
-    start = time.time()
-    def norm(vals):
-        if not isinstance(vals, list):
-            return None
-        return [float(x) for x in vals]
-    with LIGHTING_COND:
-        while True:
-            norm_last = norm(last)
-            norm_current = norm(lighting_values)
-            # Debug print
-            # print(f"[LONGPOLL] Comparing last={norm_last} current={norm_current}")
-            if norm_last is None or norm_current != norm_last:
-                break
-            remaining = timeout - (time.time() - start)
-            if remaining <= 0:
-                break
-            LIGHTING_COND.wait(timeout=remaining)
-        # Return current lighting values
-        return jsonify({"lighting": lighting_values})
-
 @app.route('/api/state', methods=['GET', 'POST'])
 def state():
     global last_local_interaction, lighting_values, schedules
