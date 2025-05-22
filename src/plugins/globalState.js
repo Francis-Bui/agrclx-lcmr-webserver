@@ -113,7 +113,11 @@ async function updateProfile (profile, BACKEND_URL) {
 
 async function deleteProfile (name, BACKEND_URL) {
   try {
-    const res = await fetch(`${BACKEND_URL}/api/profiles/${name}`, { method: 'DELETE' })
+    const res = await fetch(`${BACKEND_URL}/api/profiles`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
     if (!res.ok) throw new Error('Failed to delete profile')
     await fetchProfiles(BACKEND_URL)
   } catch {
