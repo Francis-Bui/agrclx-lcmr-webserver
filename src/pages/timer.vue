@@ -282,6 +282,15 @@
   import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
   import { useGlobalState } from '@/plugins/globalState'
 
+  /*
+    timer.vue
+    ---------
+    This page provides the UI for managing lighting schedules. Users can view, create, edit, enable/disable, and delete schedules.
+    Each schedule defines a time range and a lighting profile to apply. The UI displays all schedules as cards, with controls for editing and toggling.
+
+    Schedules are synchronized with the backend via the global state composable. The design aims for clarity and quick access to schedule actions.
+  */
+
   const lights = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
   const BACKEND_URL = `http://${window.location.hostname}:8080`
 
@@ -336,14 +345,17 @@
 
   const profilePickerDialog = ref(false)
 
+  // Fetch schedules from backend and keep in sync
   onMounted(() => {
     fetchSchedules(BACKEND_URL)
     fetchProfiles(BACKEND_URL)
   })
 
+  // Cleanup any intervals or listeners on unmount
   onUnmounted(() => {
   })
 
+  // Format a time value (military) to a human-readable string
   function formatTime (val) {
     if (!val) return '--:--'
     const [h, m, ampm] = val.split(':')
@@ -356,7 +368,7 @@
     editScheduleData.end &&
     editScheduleData.profile_name
   )
-
+  // Detect overlapping schedules
   function timesOverlap (start1, end1, start2, end2) {
     const toMin = t => {
       let [h, m, ampm] = t.split(':')
@@ -370,6 +382,7 @@
     return Math.max(s1, s2) < Math.min(e1, e2)
   }
 
+  // Open dialog to create a new schedule
   function openCreateDialog () {
     createDialog.value = true
   }
@@ -399,9 +412,11 @@
     editDialog.value = false
     editingIdx.value = null
   }
+  // Edit an existing schedule
   function editSchedule (idx) {
     openEditDialog(idx)
   }
+  // Delete a schedule by index
   async function deleteScheduleHandler (idx) {
     const schedule = schedules.value[idx]
     await deleteSchedule(schedule.id, BACKEND_URL)
@@ -439,6 +454,7 @@
     editScheduleData[timePickerDialog.type] = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${ampm}`
     timePickerDialog.visible = false
   }
+  // Handle toggling a schedule's enabled state
   function onScheduleSwitchChange (schedule) {
     updateSchedule(schedule, BACKEND_URL)
     showAlert('Schedule updated', 'success')

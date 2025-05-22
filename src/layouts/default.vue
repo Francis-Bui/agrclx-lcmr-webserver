@@ -53,17 +53,33 @@
   import { useRoute } from 'vue-router'
   import { useGlobalState } from '@/plugins/globalState.js'
 
+  /*
+    default.vue
+    -----------
+    This layout file provides the main application shell, including:
+      - The navigation bar and persistent UI elements
+      - The main content area (router-view)
+      - Global alert bar for user notifications
+      - Manual lockout popup dialog for local/remote control
+
+    All pages are wrapped in this layout for a consistent look and feel across the app.
+  */
+
+  // Access global alert state
   const { alert } = useGlobalState()
 
+  // Controls the manual lockout popup dialog
   const showManualPopup = ref(false)
   const BACKEND_URL = `http://${window.location.hostname}:8080`
   const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   let lockInterval = null
 
+  // Poll backend for lock status every second (only if not local)
   onMounted(() => {
     if (!isLocal) {
       lockInterval = setInterval(async () => {
         try {
+          // Query backend for local lock status
           const res = await fetch(`${BACKEND_URL}/api/lock_status`)
           const { local_lock } = await res.json()
           showManualPopup.value = local_lock
@@ -75,16 +91,18 @@
     }
   })
 
+  // Cleanup polling interval on component unmount
   onUnmounted(() => {
     if (lockInterval) clearInterval(lockInterval)
   })
 
+  // Handle page transitions for bottom navigation
   const route = useRoute()
   const pageOrder = ['/', '/timer', '/data']
-
   const lastIndex = ref(pageOrder.indexOf(route.path))
   const transitionName = ref('slide-left')
 
+  // Watch for route changes to determine transition direction
   watch(
     () => route.path,
     to => {

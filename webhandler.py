@@ -7,6 +7,19 @@ import os
 import json
 import threading
 
+'''
+webhandler.py
+-------------
+This is the Flask backend for the lighting control system. It provides:
+  - REST API endpoints for lighting state, profiles, and schedules
+  - WebSocket support for real-time slider updates
+  - File-based storage for profiles and schedules (JSON on disk)
+  - Local lockout logic to prevent remote changes during local use
+  - Thread safety for concurrent access to profile/schedule files
+
+All API endpoints are documented with comments. This backend is designed for easy integration with the Vue frontend and supports multi-client real-time sync.
+'''
+
 eventlet.monkey_patch()
 
 app = Flask(__name__, static_folder='templates/assets')
@@ -25,6 +38,7 @@ os.makedirs(PROFILE_DIR, exist_ok=True)
 os.makedirs(SCHEDULE_DIR, exist_ok=True)
 
 def load_state():
+    # Load lighting and schedule state from disk (if exists)
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r') as f:
             try:
@@ -38,6 +52,7 @@ def load_state():
     return [0, 0, 0, 0, 0, 0], []
 
 def save_state(lighting_values, schedules):
+    # Save lighting and schedule state to disk
     with open(STATE_FILE, 'w') as f:
         json.dump({
             'lighting_values': lighting_values,
@@ -67,6 +82,7 @@ LIGHTING_COND = threading.Condition()
 
 @app.route('/api/state', methods=['GET', 'POST'])
 def state():
+    # Handle getting/setting lighting and schedule state
     global last_local_interaction, lighting_values, schedules
 
     if request.method == 'POST':
@@ -107,6 +123,7 @@ def state():
         return jsonify(result)
 
 def list_profiles():
+    # List all saved lighting profiles from disk
     profiles = []
     for fname in os.listdir(PROFILE_DIR):
         if fname.endswith(".json"):
@@ -170,6 +187,7 @@ def profiles():
                 return jsonify({"error": str(e)}), 500
 
 def list_schedules():
+    # List all saved schedules from disk
     schedules = []
     for fname in os.listdir(SCHEDULE_DIR):
         if fname.endswith(".json"):
@@ -254,11 +272,14 @@ def schedules_api():
 
 @socketio.on('connect')
 def handle_connect():
+    # On WebSocket connect, send current lighting state
     emit('slider_update', {'lighting': lighting_values})
 
 @socketio.on('get_state')
 def handle_get_state():
+    # On WebSocket request, send current lighting state
     emit('slider_update', {'lighting': lighting_values})
 
 if __name__ == '__main__':
+    # Start the Flask app with SocketIO
     socketio.run(app, host = '0.0.0.0', debug=True, port=8080)

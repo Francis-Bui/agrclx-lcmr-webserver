@@ -151,10 +151,25 @@
   import { useGlobalState } from '@/plugins/globalState.js'
   import { io } from 'socket.io-client'
 
+  /*
+    index.vue
+    ---------
+    This is the main control page for the lighting system. It provides:
+      - Vertical sliders for each light channel (IR, Red, Green, Blue, White, UV)
+      - Floating action buttons for saving/loading/resetting profiles
+      - Dialogs for profile management with previews
+      - Real-time updates via WebSocket for multi-client sync
+      - Animated alerts and a modern, responsive UI
+
+    All state is synchronized with the backend and other clients for a seamless experience.
+  */
+
+  // Light channel names
   const chips = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
   const BACKEND_URL = `http://${window.location.hostname}:8080`
   const lockStatus = reactive({ local_lock: false })
 
+  // Reactive slider values for each channel
   const sliderValues = reactive({
     IR: 0,
     Red: 0,
@@ -164,6 +179,7 @@
     UV: 0,
   })
 
+  // Color mapping for each channel
   const chipColors = {
     IR: '#b71c1c',
     Red: '#ff5252',
@@ -173,7 +189,7 @@
     UV: '#7c4dff',
   }
 
-  // Use global state composable
+  // Use global state composable for profiles, alerts, and CRUD
   const {
     profiles,
     alert,
@@ -183,13 +199,15 @@
     showAlert,
   } = useGlobalState()
 
-  // Dialogs and UI state
+  // Dialog state for save/load dialogs
   const dialogs = reactive({ save: false, load: false })
   const profileName = ref('')
 
+  // Reset button animation state
   const resetSpinning = ref(false)
   function resetSliders () {
     if (lockStatus.local_lock) return
+    // Reset all sliders to 0
     Object.keys(sliderValues).forEach(k => sliderValues[k] = 0)
     sendSlidersToBackend()
     resetSpinning.value = true
@@ -197,6 +215,7 @@
     showAlert('All lights reset to 0%', 'success')
   }
 
+  // WebSocket connection for real-time updates
   const socket = ref(null)
 
   onMounted(() => {
@@ -205,6 +224,7 @@
     socket.value.on('connect', () => {
       // Optionally show connection status
     })
+    // Listen for lighting updates from backend
     socket.value.on('slider_update', data => {
       if (data && Array.isArray(data.lighting)) {
         const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
@@ -213,17 +233,19 @@
         })
       }
     })
-    // On connect, request current state (optional)
+    // On connect, request current state
     socket.value.emit('get_state')
   })
 
   onUnmounted(() => {
+    // Disconnect WebSocket on component unmount
     if (socket.value) {
       socket.value.disconnect()
       socket.value = null
     }
   })
 
+  // Open/close save dialog
   function openSaveDialog () {
     profileName.value = ''
     dialogs.save = true
@@ -231,6 +253,7 @@
   function closeSaveDialog () {
     dialogs.save = false
   }
+  // Open/close load dialog
   function openLoadDialog () {
     fetchProfiles(BACKEND_URL) // Only fetch when dialog opens
     dialogs.load = true
@@ -239,6 +262,7 @@
     dialogs.load = false
   }
 
+  // Save a new profile to backend
   async function saveProfile () {
     const payload = {
       name: profileName.value,
@@ -249,6 +273,7 @@
     dialogs.save = false
   }
 
+  // Load a profile's values into the sliders
   function selectProfile (profile) {
     chips.forEach((k, i) => (sliderValues[k] = profile.values[i]))
     sendSlidersToBackend()
@@ -256,11 +281,13 @@
     showAlert('Profile loaded!', 'success')
   }
 
+  // Delete a profile from backend
   async function handleDeleteProfile (profile) {
     await deleteProfile(profile.name, BACKEND_URL)
     fetchProfiles(BACKEND_URL) // Refresh after delete
   }
 
+  // Send current slider values to backend
   function sendSlidersToBackend () {
     fetch(`${BACKEND_URL}/api/state`, {
       method: 'POST',
@@ -269,16 +296,19 @@
     })
   }
 
+  // Called when a slider is changed
   function onSliderChange () {
     sendSlidersToBackend()
     // Do not update UI here; wait for WebSocket event
   }
 
+  // Get slider values as array in backend order
   function getLightingArrayFromSliders () {
     const order = ['IR', 'Red', 'Green', 'Blue', 'White', 'UV']
     return order.map(k => Number(sliderValues[k]) || 0)
   }
 
+  // Compute box shadow and animation for slider based on value
   function getBoxStyle (chip) {
     const color = chipColors[chip]
     const intensity = sliderValues[chip] / 100

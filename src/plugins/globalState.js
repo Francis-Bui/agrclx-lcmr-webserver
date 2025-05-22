@@ -1,15 +1,26 @@
 import { reactive, ref } from 'vue'
 
-// Singleton state
+/*
+  globalState.js
+  ----------------
+  This file provides a global reactive state and utility functions for managing lighting profiles, schedules, and UI alerts in the Vue frontend.
+  It centralizes all API interactions with the Flask backend, ensuring reactivity and a single source of truth for the app's data.
+
+  To reduce unnecessary network traffic, the app uses a localStorage-based ping system. Only when a remote client is detected (i.e., another browser tab or device is active),
+  does the app start polling the backend for updates (schedules/profiles). This minimizes POST/GET requests and keeps the UI in sync only when needed.
+*/
+
+// Singleton state for schedules, profiles, and alerts
 const schedules = ref([])
 const profiles = ref([])
 const alert = reactive({ visible: false, message: '', type: 'success', timeout: 3000 })
-const isRemoteClient = ref(true) // Set this based on your app's logic if needed
+const isRemoteClient = ref(true)
 let pollInterval = null
 let pingInterval = null
 let remotePingInterval = null
 let remoteCheckInterval = null
 
+// Show a UI alert with a message and type (success, error, etc.)
 function showAlert (message, type = 'success', timeout = 3000) {
   alert.message = message
   alert.type = type
@@ -18,6 +29,7 @@ function showAlert (message, type = 'success', timeout = 3000) {
   setTimeout(() => { alert.visible = false }, timeout)
 }
 
+// Fetch all schedules from the backend and update state
 async function fetchSchedules (BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`)
@@ -29,6 +41,7 @@ async function fetchSchedules (BACKEND_URL) {
   }
 }
 
+// Fetch all profiles from the backend and update state
 async function fetchProfiles (BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles`)
@@ -40,6 +53,7 @@ async function fetchProfiles (BACKEND_URL) {
   }
 }
 
+// Create a new schedule via the backend API
 async function createSchedule (schedule, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`, {
@@ -54,6 +68,7 @@ async function createSchedule (schedule, BACKEND_URL) {
   }
 }
 
+// Update an existing schedule via the backend API
 async function updateSchedule (schedule, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`, {
@@ -68,6 +83,7 @@ async function updateSchedule (schedule, BACKEND_URL) {
   }
 }
 
+// Delete a schedule by ID via the backend API
 async function deleteSchedule (id, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/schedules`, {
@@ -82,7 +98,7 @@ async function deleteSchedule (id, BACKEND_URL) {
   }
 }
 
-// Profile CRUD (implement as needed, similar to schedules)
+// Create a new profile via the backend API
 async function createProfile (profile, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles`, {
@@ -97,6 +113,7 @@ async function createProfile (profile, BACKEND_URL) {
   }
 }
 
+// Update an existing profile via the backend API
 async function updateProfile (profile, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles/${profile.name}`, {
@@ -111,6 +128,7 @@ async function updateProfile (profile, BACKEND_URL) {
   }
 }
 
+// Delete a profile by name via the backend API
 async function deleteProfile (name, BACKEND_URL) {
   try {
     const res = await fetch(`${BACKEND_URL}/api/profiles`, {
@@ -125,7 +143,7 @@ async function deleteProfile (name, BACKEND_URL) {
   }
 }
 
-// Each client uses a unique index (0-4) for up to 5 clients
+// Assign a unique client index (0-4) for up to 5 clients, used for local presence detection
 function updateClientPing () {
   const now = Date.now()
   let myIdx = -1
@@ -141,18 +159,21 @@ function updateClientPing () {
   return myIdx
 }
 
+// Check if a remote client is present (another device/tab is active)
 function isRemoteClientPresent () {
   const now = Date.now()
   const remotePing = localStorage.getItem('data_vue_remote_ping')
   return remotePing && now - Number(remotePing) < 2200
 }
 
+// Update the remote ping timestamp (used for remote presence detection)
 function updateRemotePing () {
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     localStorage.setItem('data_vue_remote_ping', Date.now())
   }
 }
 
+// Start polling schedules/profiles only if a remote client is present
 function startPolling (BACKEND_URL) {
   // Setup ping intervals only once
   if (pingInterval || remotePingInterval || remoteCheckInterval) return
@@ -181,6 +202,7 @@ function startPolling (BACKEND_URL) {
   }, 1200)
 }
 
+// Stop all polling and ping intervals (cleanup)
 function stopPolling () {
   if (pollInterval) clearInterval(pollInterval)
   if (pingInterval) clearInterval(pingInterval)
@@ -192,10 +214,12 @@ function stopPolling () {
   remoteCheckInterval = null
 }
 
+// Ensure polling is stopped when the window unloads
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', stopPolling)
 }
 
+// Export the global state and all utility functions for use in components
 export function useGlobalState () {
   return {
     schedules,
