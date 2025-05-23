@@ -44,10 +44,13 @@ This project is a full-stack web application for controlling and scheduling mult
 
 ## Quick Start
 
-1. **Backend:**
-   - Run `python webhandler.py` (requires Flask, Flask-CORS, Flask-SocketIO, eventlet)
-2. **Frontend:**
+1. **Frontend:**
    - Install dependencies: `npm install`
-   - Start dev server: `npm run dev:build`
+   - Start dev server: `npm run build:deploy` (The ':deploy' copies the built css and js files over)
    - Copy `.v-slider.v-input--vertical > .v-input__control {min-height: 0 !important; height: 100% !important;}` into the built index.css file.
-3. Open the app in your browser (default: `http://localhost:8080`)
+
+2. **Backend:**
+   - Run `python webhandler.py` (requires Flask, Flask-CORS, Flask-SocketIO, eventlet)
+
+3. **Launching:**
+    - Open the app in your browser (default: `http://localhost:8080`)
