@@ -6,6 +6,7 @@ import time
 import os
 import json
 import threading
+import csv
 
 '''
 webhandler.py
@@ -27,11 +28,14 @@ CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 STATE_FILE = 'state.json'
-PROFILE_DIR = os.path.expanduser("~/Desktop/profiles")
+PROFILE_DIR = os.path.expanduser("~/Desktop/LCMR/profiles")
 PROFILE_LOCK = threading.Lock()
 
-SCHEDULE_DIR = os.path.expanduser("~/Desktop/schedules")
+SCHEDULE_DIR = os.path.expanduser("~/Desktop/LCMR/schedules")
 SCHEDULE_LOCK = threading.Lock()
+
+LOGS_DIR = os.path.expanduser("~/Desktop/LCMR/logs")
+LED_HISTORY_CSV = os.path.join(LOGS_DIR, "LED_history.csv")
 
 # Ensure profile and schedule directories exist
 os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -269,6 +273,29 @@ def schedules_api():
                 return jsonify({'status': 'deleted'}), 200
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs/led_history', methods=['GET'])
+def led_history():
+    """
+    GET: Return LED history as a list of dicts from the CSV file.
+    """
+    if not os.path.exists(LED_HISTORY_CSV):
+        return jsonify({'history': []}), 200
+    history = []
+    try:
+        with open(LED_HISTORY_CSV, newline='') as csvfile:
+            reader = csv.DictReader(csvfile, fieldnames=["timestamp", "IR", "R", "G", "B", "W", "UV"])
+            for row in reader:
+                # Optionally convert numeric fields
+                for k in ["IR", "R", "G", "B", "W", "UV"]:
+                    try:
+                        row[k] = float(row[k])
+                    except Exception:
+                        pass
+                history.append(row)
+        return jsonify({'history': history}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @socketio.on('connect')
 def handle_connect():
