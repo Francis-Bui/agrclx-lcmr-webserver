@@ -418,26 +418,6 @@
   /* Remove border for white bar, always use color */
 }
 
-.alert {
-  position: fixed;
-  left: 50%;
-  bottom: 32px;
-  transform: translateX(-50%);
-  min-width: 220px;
-  max-width: 90vw;
-  padding: 16px 32px;
-  border-radius: 12px;
-  font-weight: bold;
-  font-size: 1.1em;
-  z-index: 9999;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-  text-align: center;
-  opacity: 0.97;
-}
-.alert.success { background: #4caf50; color: #fff; }
-.alert.error { background: #ff5252; color: #fff; }
-.alert.warning { background: #ffb300; color: #333; }
-
 .bounce-fade-enter-active {
   animation: bounce-in 0.5s;
 }
