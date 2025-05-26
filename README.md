@@ -10,6 +10,8 @@ This project is a full-stack web application for controlling and scheduling mult
   - Lighting state (GET/POST `/api/state`)
   - Profile CRUD (GET/POST/DELETE `/api/profiles`)
   - Schedule CRUD (GET/POST/PUT/DELETE `/api/schedules`)
+  - Event logging CRUD (GET/POST `/api/logs/event_history`)
+  - Sending light state log (GET `/api/logs/led_history`)
   - WebSocket events for real-time slider updates
 - Uses file-based storage for profiles and schedules (JSON files on disk).
 - Implements a local lockout mechanism to prevent remote changes during local use.
@@ -28,6 +30,14 @@ This project is a full-stack web application for controlling and scheduling mult
 - Allows users to view, add, edit, and delete lighting schedules.
 - Integrates with the backend's schedule API.
 
+### [src/pages/data.vue](src/pages/data.vue)
+- **Data visualization and event log UI**.
+- Features:
+  - Zoomable, interactive timeseries chart of LED, event, and data (using vue3-apexcharts)
+  - Date picker and interval selector (hour, day, week, month) for timeseries navigation
+  - LED color selector (3x2 grid) to filter chart by channel
+  - Chart interpolation for gap filling
+
 ### [src/layouts/default.vue](src/layouts/default.vue)
 - **App layout** providing the navigation bar and main content area.
 - Wraps all pages with a consistent look and feel.
@@ -36,7 +46,7 @@ This project is a full-stack web application for controlling and scheduling mult
 
 ### [src/plugins/globalState.js](src/plugins/globalState.js)
 - **Global state management** for profiles, schedules, and alerts.
-- Provides composable functions for CRUD operations and polling.
+- Provides composable functions for CRUD operations, logging, and polling.
 - Handles API calls to the backend and manages UI alerts.
 - All API interactions and state updates are centralized here for reactivity.
 
