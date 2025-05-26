@@ -20,12 +20,27 @@ let pingInterval = null
 let remotePingInterval = null
 let remoteCheckInterval = null
 
+// Log an event to event history
+export async function logEvent (action, status) {
+  try {
+    await fetch('/api/logs/event_history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, status }),
+    })
+  } catch {
+    // Ignore errors
+  }
+}
+
 // Show a UI alert with a message and type (success, error, etc.)
 function showAlert (message, type = 'success', timeout = 3000) {
   alert.message = message
   alert.type = type
   alert.visible = true
   alert.timeout = timeout
+  // Log the alert event
+  logEvent(message, type)
   setTimeout(() => { alert.visible = false }, timeout)
 }
 
