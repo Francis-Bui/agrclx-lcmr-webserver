@@ -68,7 +68,7 @@
           <div class="data-graph-content">
             <template v-if="filteredData.length > 0">
               <ApexChart
-                height="300"
+                height="500"
                 :options="chartOptions"
                 :series="chartSeries"
                 type="line"
@@ -346,14 +346,6 @@
 </script>
 
 <style scoped>
-.page-root {
-  /* Center content vertically, but leave space for nav bar */
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  padding-bottom: 80px; /* space for nav bar */
-}
 
 .v-container.fill-height {
   flex: 1 1 auto;
@@ -398,7 +390,7 @@
   align-items: center;
   justify-content: flex-start;
   padding: 24px 12px 24px 12px;
-  min-height: 182px;
+  min-height: 382px;
 }
 .data-selection-list {
   display: flex;
