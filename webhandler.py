@@ -36,6 +36,7 @@ SCHEDULE_LOCK = threading.Lock()
 
 LOGS_DIR = os.path.expanduser("~/Desktop/LCMR/logs")
 LED_HISTORY_CSV = os.path.join(LOGS_DIR, "LED_history.csv")
+EVENT_HISTORY_CSV = os.path.join(LOGS_DIR, "event_history.csv")
 
 # Ensure profile and schedule directories exist
 os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -84,10 +85,23 @@ def lock_status():
 
 LIGHTING_COND = threading.Condition()
 
+# For slider change event logging cooldown
+SLIDER_LOG_COOLDOWN = 1.0  # seconds
+last_slider_log_time = 0
+last_slider_log_values = None
+slider_log_timer = None
+pending_slider_log = None
+pending_slider_log_first = None
+
+import threading
+
+def log_slider_change(prev, new):
+    log_event(f"Intensity values changed from {prev} to {new}", "success")
+
 @app.route('/api/state', methods=['GET', 'POST'])
 def state():
-    # Handle getting/setting lighting and schedule state
     global last_local_interaction, lighting_values, schedules
+    global last_slider_log_time, last_slider_log_values, slider_log_timer, pending_slider_log, pending_slider_log_first
 
     if request.method == 'POST':
         data = request.get_json()
@@ -100,11 +114,31 @@ def state():
                 print("[REMOTE BLOCKED] Local interface in use.")
                 return jsonify({"status": "locked", "message": "Manual interface in use"}), 423
             print("[REMOTE] Received from frontend:", data)
-        # Update global state
         lighting_changed = False
         if data.get('lighting'):
             if data['lighting'] != lighting_values:
                 lighting_changed = True
+                prev = lighting_values
+                new = data['lighting']
+                # Cancel any existing timer
+                if slider_log_timer is not None:
+                    slider_log_timer.cancel()
+                # On first change in a burst, record the initial value
+                if pending_slider_log_first is None:
+                    pending_slider_log_first = prev.copy() if hasattr(prev, 'copy') else list(prev)
+                # Always update the latest value
+                pending_slider_log = new.copy() if hasattr(new, 'copy') else list(new)
+                # Start a new timer
+                def do_log():
+                    global last_slider_log_time, last_slider_log_values, slider_log_timer, pending_slider_log, pending_slider_log_first
+                    log_slider_change(pending_slider_log_first, pending_slider_log)
+                    last_slider_log_time = time.time()
+                    last_slider_log_values = pending_slider_log
+                    slider_log_timer = None
+                    pending_slider_log = None
+                    pending_slider_log_first = None
+                slider_log_timer = threading.Timer(SLIDER_LOG_COOLDOWN, do_log)
+                slider_log_timer.start()
             lighting_values = data['lighting']
         if data.get('scheduleData') and data['scheduleData']:
             schedules = data['scheduleData']['schedules']
@@ -292,6 +326,42 @@ def led_history():
                         row[k] = float(row[k])
                     except Exception:
                         pass
+                history.append(row)
+        return jsonify({'history': history}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def log_event(action, status):
+    """Append an event to the event_history.csv with timestamp, action, and status (success/error)."""
+    os.makedirs(LOGS_DIR, exist_ok=True)
+    with open(EVENT_HISTORY_CSV, 'a', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow([time.strftime('%Y-%m-%dT%H:%M:%S'), action, status])
+
+@app.route('/api/logs/event_history', methods=['POST'])
+def add_event():
+    """POST: Add an event to the event_history.csv."""
+    data = request.get_json()
+    action = data.get('action')
+    status = data.get('status')
+    if not action or not status:
+        return jsonify({'error': 'Missing action or status'}), 400
+    try:
+        log_event(action, status)
+        return jsonify({'status': 'logged'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/logs/event_history', methods=['GET'])
+def get_event_history():
+    """GET: Return event history as a list of dicts from the CSV file."""
+    if not os.path.exists(EVENT_HISTORY_CSV):
+        return jsonify({'history': []}), 200
+    history = []
+    try:
+        with open(EVENT_HISTORY_CSV, newline='') as csvfile:
+            reader = csv.DictReader(csvfile, fieldnames=["timestamp", "action", "status"])
+            for row in reader:
                 history.append(row)
         return jsonify({'history': history}), 200
     except Exception as e:
