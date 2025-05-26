@@ -140,9 +140,9 @@
 .slide-left-leave-active,
 .slide-right-enter-active,
 .slide-right-leave-active {
-  position: fixed !important;
-  width: 100vw;
-  height: 100vh;
+  position: absolute !important;
+  width: 100%;
+  height: 100%;
   top: 0;
   left: 0;
   transition: transform 0.5s cubic-bezier(.77,0,.175,1) !important;
