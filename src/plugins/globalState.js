@@ -51,6 +51,7 @@ async function fetchSchedules (BACKEND_URL) {
     if (!res.ok) throw new Error('Failed to fetch schedules')
     const data = await res.json()
     schedules.value = data.schedules || []
+    // No alert for successful fetch
   } catch {
     showAlert('Failed to fetch schedules', 'error')
   }
@@ -63,6 +64,7 @@ async function fetchProfiles (BACKEND_URL) {
     if (!res.ok) throw new Error('Failed to fetch profiles')
     const data = await res.json()
     profiles.value = data.profiles || []
+    // No alert for successful fetch
   } catch {
     showAlert('Failed to fetch profiles', 'error')
   }
@@ -78,6 +80,7 @@ async function createSchedule (schedule, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to create schedule')
     await fetchSchedules(BACKEND_URL)
+    showAlert('Schedule created', 'success')
   } catch {
     showAlert('Failed to create schedule', 'error')
   }
@@ -93,6 +96,7 @@ async function updateSchedule (schedule, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to update schedule')
     await fetchSchedules(BACKEND_URL)
+    showAlert('Schedule updated', 'success')
   } catch {
     showAlert('Failed to update schedule', 'error')
   }
@@ -108,6 +112,7 @@ async function deleteSchedule (id, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to delete schedule')
     await fetchSchedules(BACKEND_URL)
+    showAlert('Schedule deleted', 'success')
   } catch {
     showAlert('Failed to delete schedule', 'error')
   }
@@ -123,6 +128,7 @@ async function createProfile (profile, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to create profile')
     await fetchProfiles(BACKEND_URL)
+    showAlert('Profile created', 'success')
   } catch {
     showAlert('Failed to create profile', 'error')
   }
@@ -138,6 +144,7 @@ async function updateProfile (profile, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to update profile')
     await fetchProfiles(BACKEND_URL)
+    showAlert('Profile updated', 'success')
   } catch {
     showAlert('Failed to update profile', 'error')
   }
@@ -153,6 +160,7 @@ async function deleteProfile (name, BACKEND_URL) {
     })
     if (!res.ok) throw new Error('Failed to delete profile')
     await fetchProfiles(BACKEND_URL)
+    showAlert('Profile deleted', 'success')
   } catch {
     showAlert('Failed to delete profile', 'error')
   }
