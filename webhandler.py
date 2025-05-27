@@ -7,7 +7,15 @@ import os
 import json
 import threading
 import csv
+import signal
+import sys
 
+def graceful_exit(signum, frame):
+    print("Shutting down webhandler...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, graceful_exit)
+signal.signal(signal.SIGINT, graceful_exit)
 '''
 webhandler.py
 -------------
@@ -379,4 +387,4 @@ def handle_get_state():
 
 if __name__ == '__main__':
     # Start the Flask app with SocketIO
-    socketio.run(app, host = '0.0.0.0', debug=True, port=8080)
+    socketio.run(app, host = '0.0.0.0', debug=True, use_reloader=False, port=8080)
