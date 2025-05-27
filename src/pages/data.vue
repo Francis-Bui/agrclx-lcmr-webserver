@@ -15,7 +15,7 @@
               rounded="pill"
               style="display: flex; align-items: center; justify-content: center; position: relative; min-height: 44px; font-weight: 600; font-size: 1.1em; box-shadow: 0 2px 8px rgba(0,0,0,0.10);"
               :variant="item.checked ? 'elevated' : 'flat'"
-              @click="item.checked = !item.checked"
+              @click="onSelectionClick(item)"
             >
               <span v-if="item.checked" class="checkmark-wrapper">
                 <v-icon start style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%);">mdi-check</v-icon>
@@ -55,6 +55,7 @@
               <span class="ml-2">{{ selectedDateLabel }}</span>
             </v-btn>
             <v-btn
+              v-if="!isEventsMode"
               class="data-interval-btn ml-auto"
               color="primary"
               elevation="4"
@@ -66,7 +67,39 @@
             </v-btn>
           </div>
           <div class="data-graph-content">
-            <template v-if="filteredData.length > 0">
+            <template v-if="isEventsMode">
+              <div class="event-log-terminal-light">
+                <div class="event-log-list">
+                  <div
+                    v-for="(row, idx) in eventLog"
+                    :key="idx"
+                    class="event-log-row-light"
+                    :class="{ 'event-log-row-alt-light': idx % 2 === 1 }"
+                  >
+                    <div class="event-log-timestamp-light">{{ formatEventTimestamp(row.timestamp) }}</div>
+                    <div class="event-log-action-light" @click="showPopup(idx, row.action, $event)">
+                      <span>{{ truncateAction(row.action) }}</span>
+                      <span v-if="row.action && row.action.length > 54" class="event-log-expand-light">▼</span>
+                    </div>
+                    <div
+                      class="event-log-status-light"
+                      :class="'event-log-status-' + row.status"
+                    >{{ row.status }}</div>
+                  </div>
+                </div>
+                <div v-if="popup.visible" class="event-log-popup" :style="popup.style">
+                  <div class="event-log-popup-content">
+                    <span>{{ popup.text }}</span>
+                    <v-btn class="event-log-popup-close" icon size="small" @click="popup.visible = false"><v-icon>mdi-close</v-icon></v-btn>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template
+              v-else-if="
+                filteredData.length
+                  > 0"
+            >
               <ApexChart
                 height="500"
                 :options="chartOptions"
@@ -79,7 +112,7 @@
               <div class="data-graph-empty">No data for this period.</div>
             </template>
           </div>
-          <div class="data-graph-nav">
+          <div v-if="!isEventsMode" class="data-graph-nav">
             <v-btn icon rounded @click="navigateHistory(-1)"><v-icon>mdi-chevron-left</v-icon></v-btn>
             <v-btn icon rounded @click="navigateHistory(1)"><v-icon>mdi-chevron-right</v-icon></v-btn>
           </div>
@@ -100,7 +133,7 @@
 </template>
 
 <script setup>
-  import { computed, onMounted, reactive, ref } from 'vue'
+  import { computed, onMounted, reactive, ref, watch } from 'vue'
   import { useGlobalState } from '@/plugins/globalState'
   import ApexChart from 'vue3-apexcharts'
 
@@ -292,6 +325,9 @@
   })
 
   const ledHistory = ref([])
+  const eventLog = ref([])
+  const isEventsMode = computed(() => selectionOptions.find(o => o.key === 'events').checked)
+
   onMounted(async () => {
     fetchLedHistory()
   })
@@ -336,6 +372,31 @@
     }
   }
 
+  async function fetchEventLog () {
+    try {
+      const res = await fetch('/api/logs/event_history')
+      if (!res.ok) throw new Error('Failed to fetch event log')
+      const data = await res.json()
+      eventLog.value = data.history || []
+    } catch {
+      showAlert('Failed to load event log', 'error')
+    }
+  }
+
+  watch(
+    () => isEventsMode.value,
+    val => {
+      if (val) fetchEventLog()
+    },
+    { immediate: true }
+  )
+
+  function onSelectionClick (item) {
+    selectionOptions.forEach(opt => opt.checked = false)
+    item.checked = true
+    if (item.key === 'events') fetchEventLog()
+  }
+
   const chartSeries = computed(() => {
     if (!filteredData.value.length) return []
     return selectedLedColors.value.map(color => ({
@@ -343,6 +404,34 @@
       data: filteredData.value.map(row => [row.timestamp, row[color.key]]),
     }))
   })
+
+  const popup = ref({ visible: false, text: '', style: {} })
+  function showPopup (idx, text, event) {
+    if (!text || text.length <= 54) return
+    const rect = event.target.getBoundingClientRect()
+    popup.value = {
+      visible: true,
+      text,
+      style: {
+        position: 'fixed',
+        top: `${rect.bottom + 8}px`,
+        left: `${rect.left}px`,
+        zIndex: 9999,
+      },
+    }
+  }
+
+  function truncateAction (action) {
+    if (!action) return ''
+    return action.length > 54 ? action.slice(0, 54) + '…' : action
+  }
+  function formatEventTimestamp (ts) {
+    if (!ts) return ''
+    const d = new Date(ts)
+    if (isNaN(d)) return ts
+    const options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+    return d.toLocaleString('en-US', options)
+  }
 </script>
 
 <style scoped>
@@ -477,5 +566,124 @@
 }
 .data-led-color-square[style*='2px solid #1976d2'] {
   border: 2px solid #1976d2 !important;
+}
+.event-log-terminal-light {
+  width: 100%;
+  height: 546px;
+  background: #f7f7fa;
+  color: #222;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.event-log-list {
+  width: 100%;
+  min-height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.event-log-row-light {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 18px;
+  min-height: 38px;
+  font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 1.05em;
+  line-height: 1.5;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.event-log-row-alt-light {
+  background: #f0f0f7;
+}
+.event-log-row-light:hover {
+  background: #e3e7f7;
+}
+.event-log-timestamp-light {
+  min-width: 120px;
+  color: #1976d2;
+  margin-right: 18px;
+  font-weight: 500;
+}
+.event-log-action-light {
+  flex: 1 1 0;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  position: relative;
+  padding-right: 18px;
+}
+.event-log-action-light span {
+  vertical-align: middle;
+}
+.event-log-expand-light {
+  color: #1976d2;
+  font-size: 0.95em;
+  margin-left: 8px;
+  user-select: none;
+}
+.event-log-status-light {
+  min-width: 70px;
+  text-align: right;
+  font-weight: 600;
+  margin-left: 18px;
+  border-radius: 6px;
+  padding: 2px 10px;
+  font-size: 0.98em;
+  background: #e3e7f7;
+  color: #1976d2;
+}
+.event-log-status-success {
+  background: #c8e6c9;
+  color: #2e7d32;
+}
+.event-log-status-error {
+  background: #ffcdd2;
+  color: #b71c1c;
+}
+.event-log-status-pending {
+  color: #ffa726;
+}
+.event-log-popup {
+  position: fixed;
+  min-width: 320px;
+  max-width: 480px;
+  background: #fff;
+  color: #222;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  padding: 0;
+  z-index: 9999;
+  animation: fadeIn 0.18s;
+}
+.event-log-popup-content {
+  padding: 18px 24px 18px 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+  font-size: 1.05em;
+  word-break: break-word;
+}
+.event-log-popup-close {
+  margin-left: auto;
+  margin-top: -6px;
+  color: #888;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
 </style>
