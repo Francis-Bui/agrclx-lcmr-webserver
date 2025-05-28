@@ -12,6 +12,7 @@ import sys
 
 def graceful_exit(signum, frame):
     print("Shutting down webhandler...")
+    log_event('Webserver shutdown (signal)', 'success')
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, graceful_exit)
@@ -386,5 +387,11 @@ def handle_get_state():
     emit('slider_update', {'lighting': lighting_values})
 
 if __name__ == '__main__':
-    # Start the Flask app with SocketIO
-    socketio.run(app, host = '0.0.0.0', debug=True, use_reloader=False, port=8080)
+    # Log webserver start
+    log_event('Webserver started', 'success')
+    try:
+        # Start the Flask app with SocketIO
+        socketio.run(app, host = '0.0.0.0', debug=True, use_reloader=False, port=8080)
+    finally:
+        # Log webserver shutdown
+        log_event('Webserver shutdown', 'success')
