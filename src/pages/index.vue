@@ -418,12 +418,6 @@
   /* Remove border for white bar, always use color */
 }
 
-.bounce-fade-enter-active {
-  animation: bounce-in 0.5s;
-}
-.bounce-fade-leave-active {
-  animation: fade-out 0.4s;
-}
 @keyframes bounce-in {
   0% { opacity: 0; transform: translateY(40px) scale(0.9); }
   60% { opacity: 1; transform: translateY(-8px) scale(1.05); }
@@ -538,10 +532,7 @@
   background: #fff !important;
   border: 2px solid #ff5252 !important;
 }
-.profile-action-btn-edit {
-  background: #fff !important;
-  border: 2px solid #1976d2 !important;
-}
+
 .profile-title-center {
   text-align: center;
   width: 100%;
