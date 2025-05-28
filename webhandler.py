@@ -347,34 +347,35 @@ def log_event(action, status):
         writer = csv.writer(csvfile)
         writer.writerow([time.strftime('%Y-%m-%dT%H:%M:%S'), action, status])
 
-@app.route('/api/logs/event_history', methods=['POST'])
-def add_event():
-    """POST: Add an event to the event_history.csv."""
-    data = request.get_json()
-    action = data.get('action')
-    status = data.get('status')
-    if not action or not status:
-        return jsonify({'error': 'Missing action or status'}), 400
-    try:
-        log_event(action, status)
-        return jsonify({'status': 'logged'}), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/logs/event_history', methods=['GET'])
-def get_event_history():
-    """GET: Return event history as a list of dicts from the CSV file."""
-    if not os.path.exists(EVENT_HISTORY_CSV):
-        return jsonify({'history': []}), 200
-    history = []
-    try:
-        with open(EVENT_HISTORY_CSV, newline='') as csvfile:
-            reader = csv.DictReader(csvfile, fieldnames=["timestamp", "action", "status"])
-            for row in reader:
-                history.append(row)
-        return jsonify({'history': history}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+@app.route('/api/logs/event_history', methods=['GET', 'POST'])
+def event_history():
+    """
+    GET: Return event history as a list of dicts from the CSV file.
+    POST: Add an event to the event_history.csv.
+    """
+    if request.method == 'POST':
+        data = request.get_json()
+        action = data.get('action')
+        status = data.get('status')
+        if not action or not status:
+            return jsonify({'error': 'Missing action or status'}), 400
+        try:
+            log_event(action, status)
+            return jsonify({'status': 'logged'}), 201
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    else:  # GET
+        if not os.path.exists(EVENT_HISTORY_CSV):
+            return jsonify({'history': []}), 200
+        history = []
+        try:
+            with open(EVENT_HISTORY_CSV, newline='') as csvfile:
+                reader = csv.DictReader(csvfile, fieldnames=["timestamp", "action", "status"])
+                for row in reader:
+                    history.append(row)
+            return jsonify({'history': history}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 @socketio.on('connect')
 def handle_connect():
